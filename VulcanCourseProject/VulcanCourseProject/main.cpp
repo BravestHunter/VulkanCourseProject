@@ -28,7 +28,7 @@ int main()
 
 	VulcanRenderer renderer;
 
-	if (renderer.Init() == EXIT_FAILURE)
+	if (renderer.Init(window) == EXIT_FAILURE)
 	{
 		return EXIT_FAILURE;
 	}
