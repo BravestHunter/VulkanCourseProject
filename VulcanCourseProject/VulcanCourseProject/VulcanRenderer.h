@@ -36,6 +36,7 @@ private:
 	void CreateLogicalDevice();
 	void CreateSurface(GLFWwindow* window);
 	void CreateSwapchain();
+	void CreateCraphicsPipeline();
 
 	bool CheckInstanceExtensionSupport(std::vector<const char*> extensions);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
@@ -51,4 +52,5 @@ private:
 	VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities);
 
 	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+	VkShaderModule CreateShaderModule(const std::vector<char>& code);
 };

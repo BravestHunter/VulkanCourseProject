@@ -14,7 +14,6 @@
 bool isVulcan—ompatible();
 GLFWwindow* createWindow(const int width = 800, const int height = 600, std::string name = "Vulcan window");
 
-
 int main()
 {
 	if (isVulcan—ompatible() == false)
