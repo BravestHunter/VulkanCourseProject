@@ -27,10 +27,14 @@ private:
 	VkSurfaceKHR surface_;
 	VkSwapchainKHR swapchain_;
 	std::vector<SwapchainImage> swapchainImages_;
+	std::vector<VkFramebuffer> swapchainFramebuffers_;
+	std::vector<VkCommandBuffer> commandBuffers_;
 
 	VkPipeline graphicsPipeline_;
 	VkPipelineLayout pipelineLayout_;
 	VkRenderPass renderPass_;
+
+	VkCommandPool graphicsCommandPool_;
 
 	VkFormat swapchainImageFormat_;
 	VkExtent2D swapchainExtent_;
@@ -42,12 +46,17 @@ private:
 	void CreateSwapchain();
 	void CreateRenderPass();
 	void CreateCraphicsPipeline();
+	void CreateFramebuffers();
+	void CreateCommandPool();
+	void CreateCommandBuffers();
 
 	bool CheckInstanceExtensionSupport(std::vector<const char*> extensions);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 	bool CheckInstanceDeviceSupport(VkPhysicalDevice device);
 	bool CheckValidationLayerSupport(std::vector<const char*> layers);
 	bool CheckPhysicalDeviceSuitable(VkPhysicalDevice device);
+
+	void RecordCommands();
 
 	QueueFamilyIndices GetQueueFamilies(VkPhysicalDevice device);
 	SwapchainDetails GetSwapchainDetails(VkPhysicalDevice device);

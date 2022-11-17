@@ -16,6 +16,9 @@ int VulcanRenderer::Init(GLFWwindow* window)
 		CreateSwapchain();
 		CreateRenderPass();
 		CreateCraphicsPipeline();
+		CreateFramebuffers();
+		CreateCommandPool();
+		RecordCommands();
 	}
 	catch (const std::runtime_error &e)
 	{
@@ -28,6 +31,13 @@ int VulcanRenderer::Init(GLFWwindow* window)
 
 void VulcanRenderer::Deinit()
 {
+	vkDestroyCommandPool(mainDevice.logicalDevice, graphicsCommandPool_, nullptr);
+
+	for (VkFramebuffer framebuffer : swapchainFramebuffers_)
+	{
+		vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
+	}
+
 	vkDestroyPipeline(mainDevice.logicalDevice, graphicsPipeline_, nullptr);
 	vkDestroyPipelineLayout(mainDevice.logicalDevice, pipelineLayout_, nullptr);
 	vkDestroyRenderPass(mainDevice.logicalDevice, renderPass_, nullptr);
@@ -319,7 +329,7 @@ void VulcanRenderer::CreateRenderPass()
 	VkResult result = vkCreateRenderPass(mainDevice.logicalDevice, &renderPassCreateInfo, nullptr, &renderPass_);
 	if (result != VK_SUCCESS)
 	{
-		throw std::runtime_error("Failed to create render pass.");
+		throw std::runtime_error("Failed to create a render pass.");
 	}
 }
 
@@ -494,11 +504,77 @@ void VulcanRenderer::CreateCraphicsPipeline()
 	result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &graphicsPipeline_);
 	if (result != VK_SUCCESS)
 	{
-		throw std::runtime_error("Failed to create graphics pipeline.");
+		throw std::runtime_error("Failed to create a graphics pipeline.");
 	}
 
 	vkDestroyShaderModule(mainDevice.logicalDevice, vertexShaderModule, nullptr);
 	vkDestroyShaderModule(mainDevice.logicalDevice, fragmentShaderModule, nullptr);
+}
+
+void VulcanRenderer::CreateFramebuffers()
+{
+	swapchainFramebuffers_.resize(swapchainImages_.size());
+
+	for (size_t i = 0; i < swapchainFramebuffers_.size(); i++)
+	{
+		std::vector<VkImageView> attachments
+		{
+			swapchainImages_[i].imageView
+		};
+
+		VkFramebufferCreateInfo framebufferCreateInfo
+		{
+			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.renderPass = renderPass_,
+			.attachmentCount = static_cast<uint32_t>(attachments.size()),
+			.pAttachments = attachments.data(),
+			.width = swapchainExtent_.width,
+			.height = swapchainExtent_.height,
+			.layers = 1
+		};
+
+		VkResult result = vkCreateFramebuffer(mainDevice.logicalDevice, &framebufferCreateInfo, nullptr, &swapchainFramebuffers_[i]);
+		if (result != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create a famebuffer.");
+		}
+	}
+}
+
+void VulcanRenderer::CreateCommandPool()
+{
+	QueueFamilyIndices queueFamilyIndices = GetQueueFamilies(mainDevice.physicalDevice);
+
+	VkCommandPoolCreateInfo commandPoolCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+		.queueFamilyIndex = static_cast<uint32_t>(queueFamilyIndices.graphicsFamily)
+	};
+
+	VkResult result = vkCreateCommandPool(mainDevice.logicalDevice, &commandPoolCreateInfo, nullptr, &graphicsCommandPool_);
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create a command pool.");
+	}
+}
+
+void VulcanRenderer::CreateCommandBuffers()
+{
+	commandBuffers_.resize(swapchainFramebuffers_.size());
+
+	VkCommandBufferAllocateInfo commandBufferAllocateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = graphicsCommandPool_,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = static_cast<uint32_t>(commandBuffers_.size())
+	};
+
+	VkResult result = vkAllocateCommandBuffers(mainDevice.logicalDevice, &commandBufferAllocateInfo, commandBuffers_.data());
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to acllocate command buffers.");
+	}
 }
 
 
@@ -623,6 +699,62 @@ bool VulcanRenderer::CheckPhysicalDeviceSuitable(VkPhysicalDevice device)
 	}
 
 	return true;
+}
+
+
+void VulcanRenderer::RecordCommands()
+{
+	VkCommandBufferBeginInfo commandBufferBeginInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
+	};
+
+	VkClearValue clearValues[]
+	{
+		VkClearValue
+		{
+			.color = VkClearColorValue { 0.6f, 0.65f, 0.4f, 0.0f }
+		}
+	};
+
+	VkRenderPassBeginInfo renderPassBeginInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderPass = renderPass_,
+		.renderArea = VkRect2D
+		{
+			.offset = VkOffset2D { 0, 0 },
+			.extent = swapchainExtent_
+		},
+		.clearValueCount = 1,
+		.pClearValues = clearValues
+	};
+
+	for (size_t i = 0; i < commandBuffers_.size(); i++)
+	{
+		renderPassBeginInfo.framebuffer = swapchainFramebuffers_[i];
+
+		VkResult result = vkBeginCommandBuffer(commandBuffers_[i], &commandBufferBeginInfo);
+		if (result != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to start recording a command buffer.");
+		}
+
+		vkCmdBeginRenderPass(commandBuffers_[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		{
+			vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
+
+			vkCmdDraw(commandBuffers_[i], 3, 1, 0, 0);
+		}
+
+		result = vkEndCommandBuffer(commandBuffers_[i]);
+		if (result != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to stop recording a command buffer.");
+		}
+	}
 }
 
 
