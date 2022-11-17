@@ -28,6 +28,10 @@ private:
 	VkSwapchainKHR swapchain_;
 	std::vector<SwapchainImage> swapchainImages_;
 
+	VkPipeline graphicsPipeline_;
+	VkPipelineLayout pipelineLayout_;
+	VkRenderPass renderPass_;
+
 	VkFormat swapchainImageFormat_;
 	VkExtent2D swapchainExtent_;
 
@@ -36,6 +40,7 @@ private:
 	void CreateLogicalDevice();
 	void CreateSurface(GLFWwindow* window);
 	void CreateSwapchain();
+	void CreateRenderPass();
 	void CreateCraphicsPipeline();
 
 	bool CheckInstanceExtensionSupport(std::vector<const char*> extensions);
