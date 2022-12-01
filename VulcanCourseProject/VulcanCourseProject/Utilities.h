@@ -4,6 +4,8 @@
 #include <string>
 #include <fstream>
 
+#include <glm/glm.hpp>
+
 
 const int MAX_FRAME_DRAWS = 2;
 
@@ -44,6 +46,12 @@ struct SwapchainImage
 {
 	VkImage image;
 	VkImageView imageView;
+};
+
+struct Vertex
+{
+	glm::vec3 position;
+	glm::vec3 color;
 };
 
 static std::vector<char> readBinaryFile(const std::string& filename)

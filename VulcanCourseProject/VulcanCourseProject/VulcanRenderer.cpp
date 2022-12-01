@@ -13,6 +13,19 @@ int VulcanRenderer::Init(GLFWwindow* window)
 		CreateSurface(window);
 		GetPhysicalDevice();
 		CreateLogicalDevice();
+
+		std::vector<Vertex> meshVertices
+		{
+			Vertex { {0.4f, -0.4f, 0.0f}, {1.0f, 0.0f, 0.0f} },
+			Vertex { {0.4f, 0.4f, 0.0f}, {0.0f, 1.0f, 0.0f} },
+			Vertex { {-0.4f, 0.4f, 0.0f}, {0.0f, 0.0f, 1.0f} },
+
+			Vertex { {-0.4f, 0.4f, 0.0f}, {1.0f, 1.0f, 0.0f} },
+			Vertex { {-0.4f, -0.4f, 0.0f}, {1.0f, 0.0f, 1.0f} },
+			Vertex { {0.4f, -0.4f, 0.0f}, {0.0, 1.0f, 1.0f} }
+		};
+		mesh_ = std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, meshVertices);
+
 		CreateSwapchain();
 		CreateRenderPass();
 		CreateCraphicsPipeline();
@@ -34,6 +47,8 @@ int VulcanRenderer::Init(GLFWwindow* window)
 void VulcanRenderer::Deinit()
 {
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
+
+	mesh_->DestroyVertexBuffer();
 
 	for (size_t i = 0; i < MAX_FRAME_DRAWS; i++)
 	{
@@ -420,13 +435,40 @@ void VulcanRenderer::CreateCraphicsPipeline()
 	VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderCreateInfo, fragmentShaderCreateInfo };
 
 
+	uint32_t binding = 0;
+
+	VkVertexInputBindingDescription bindingDescription
+	{
+		.binding = binding,
+		.stride = sizeof(Vertex),
+		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+	};
+
+	std::vector<VkVertexInputAttributeDescription> attributeDescriptions =
+	{
+		VkVertexInputAttributeDescription
+		{
+			.location = 0,
+			.binding = binding,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex, position)
+		},
+		VkVertexInputAttributeDescription
+		{
+			.location = 1,
+			.binding = binding,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex, color)
+		}
+	};
+
 	VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-		.vertexBindingDescriptionCount = 0,
-		.pVertexBindingDescriptions = nullptr,
-		.vertexAttributeDescriptionCount = 0,
-		.pVertexAttributeDescriptions = nullptr
+		.vertexBindingDescriptionCount = 1,
+		.pVertexBindingDescriptions = &bindingDescription,
+		.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
+		.pVertexAttributeDescriptions = attributeDescriptions.data()
 	};
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo
@@ -837,7 +879,11 @@ void VulcanRenderer::RecordCommands()
 		{
 			vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
-			vkCmdDraw(commandBuffers_[i], 3, 1, 0, 0);
+			VkBuffer vertexBuffers[] = { mesh_->GetVertexBuffer() };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(commandBuffers_[i], 0, 1, vertexBuffers, offsets);
+
+			vkCmdDraw(commandBuffers_[i], mesh_->GetVertexCount(), 1, 0, 0);
 		}
 		vkCmdEndRenderPass(commandBuffers_[i]);
 

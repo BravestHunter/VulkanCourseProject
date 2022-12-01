@@ -2,11 +2,13 @@
 
 #include <stdexcept>
 #include <vector>
+#include <memory>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 #include "Utilities.h"
+#include "Mesh.h"
 
 
 class VulcanRenderer
@@ -19,6 +21,7 @@ public:
 
 private:
 	int currentFrame_ = 0;
+
 	GLFWwindow* window_;
 	VkInstance vkInsatance_;
 	struct {
@@ -45,6 +48,8 @@ private:
 	std::vector<VkSemaphore> imageAvailableSemaphores_;
 	std::vector<VkSemaphore> renderFinishedSemaphores_;
 	std::vector<VkFence> drawFences_;
+
+	std::unique_ptr<Mesh> mesh_;
 
 	void CreateVkInstance();
 	void GetPhysicalDevice();
