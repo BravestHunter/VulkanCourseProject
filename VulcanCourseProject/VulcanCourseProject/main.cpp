@@ -35,6 +35,7 @@ int main()
 	while (glfwWindowShouldClose(window) == false)
 	{
 		glfwPollEvents();
+		renderer.Draw();
 	}
 
 	renderer.Deinit();

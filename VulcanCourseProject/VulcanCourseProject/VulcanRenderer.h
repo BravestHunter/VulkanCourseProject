@@ -15,7 +15,10 @@ public:
 	int Init(GLFWwindow* window);
 	void Deinit();
 
+	void Draw();
+
 private:
+	int currentFrame_ = 0;
 	GLFWwindow* window_;
 	VkInstance vkInsatance_;
 	struct {
@@ -39,6 +42,10 @@ private:
 	VkFormat swapchainImageFormat_;
 	VkExtent2D swapchainExtent_;
 
+	std::vector<VkSemaphore> imageAvailableSemaphores_;
+	std::vector<VkSemaphore> renderFinishedSemaphores_;
+	std::vector<VkFence> drawFences_;
+
 	void CreateVkInstance();
 	void GetPhysicalDevice();
 	void CreateLogicalDevice();
@@ -49,6 +56,7 @@ private:
 	void CreateFramebuffers();
 	void CreateCommandPool();
 	void CreateCommandBuffers();
+	void CreateSynchronization();
 
 	bool CheckInstanceExtensionSupport(std::vector<const char*> extensions);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);

@@ -18,11 +18,13 @@ int VulcanRenderer::Init(GLFWwindow* window)
 		CreateCraphicsPipeline();
 		CreateFramebuffers();
 		CreateCommandPool();
+		CreateCommandBuffers();
 		RecordCommands();
+		CreateSynchronization();
 	}
 	catch (const std::runtime_error &e)
 	{
-		printf("Error: %s\n");
+		printf("Error: %s\n", e.what());
 		return EXIT_FAILURE;
 	}
 
@@ -31,6 +33,14 @@ int VulcanRenderer::Init(GLFWwindow* window)
 
 void VulcanRenderer::Deinit()
 {
+	vkDeviceWaitIdle(mainDevice.logicalDevice);
+
+	for (size_t i = 0; i < MAX_FRAME_DRAWS; i++)
+	{
+		vkDestroySemaphore(mainDevice.logicalDevice, renderFinishedSemaphores_[i], nullptr);
+		vkDestroySemaphore(mainDevice.logicalDevice, imageAvailableSemaphores_[i], nullptr);
+		vkDestroyFence(mainDevice.logicalDevice, drawFences_[i], nullptr);
+	}
 	vkDestroyCommandPool(mainDevice.logicalDevice, graphicsCommandPool_, nullptr);
 
 	for (VkFramebuffer framebuffer : swapchainFramebuffers_)
@@ -51,6 +61,57 @@ void VulcanRenderer::Deinit()
 	vkDestroySurfaceKHR(vkInsatance_, surface_, nullptr);
 	vkDestroyDevice(mainDevice.logicalDevice, nullptr);
 	vkDestroyInstance(vkInsatance_, nullptr);
+}
+
+
+void VulcanRenderer::Draw()
+{
+	vkWaitForFences(mainDevice.logicalDevice, 1, &drawFences_[currentFrame_], VK_TRUE, std::numeric_limits<uint64_t>::max());
+	vkResetFences(mainDevice.logicalDevice, 1, &drawFences_[currentFrame_]);
+
+	uint32_t imageIndex;
+	vkAcquireNextImageKHR(mainDevice.logicalDevice, swapchain_, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores_[currentFrame_], VK_NULL_HANDLE, &imageIndex);
+
+	VkPipelineStageFlags waitStageFlags[]
+	{
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+	};
+
+	VkSubmitInfo submitInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &imageAvailableSemaphores_[currentFrame_],
+		.pWaitDstStageMask = waitStageFlags,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &commandBuffers_[imageIndex],
+		.signalSemaphoreCount = 1,
+		.pSignalSemaphores = &renderFinishedSemaphores_[currentFrame_]
+	};
+
+	VkResult result = vkQueueSubmit(graphicsQueue_, 1, &submitInfo, drawFences_[currentFrame_]);
+	if (result != VK_SUCCESS) 
+	{
+		throw std::runtime_error("Failed to submit command buffer to queue.");
+	}
+
+	VkPresentInfoKHR presentInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &renderFinishedSemaphores_[currentFrame_],
+		.swapchainCount = 1,
+		.pSwapchains = &swapchain_,
+		.pImageIndices = &imageIndex
+	};
+
+	result = vkQueuePresentKHR(graphicsQueue_, &presentInfo);
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to present image.");
+	}
+
+	currentFrame_ = (currentFrame_ + 1) % MAX_FRAME_DRAWS; 
 }
 
 
@@ -268,7 +329,7 @@ void VulcanRenderer::CreateRenderPass()
 	{
 		.format = swapchainImageFormat_,
 		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -577,6 +638,38 @@ void VulcanRenderer::CreateCommandBuffers()
 	}
 }
 
+void VulcanRenderer::CreateSynchronization()
+{
+	imageAvailableSemaphores_.resize(MAX_FRAME_DRAWS);
+	renderFinishedSemaphores_.resize(MAX_FRAME_DRAWS);
+	drawFences_.resize(MAX_FRAME_DRAWS);
+
+	VkSemaphoreCreateInfo semaphoreCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+	};
+
+	VkFenceCreateInfo fenceCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+		.flags = VK_FENCE_CREATE_SIGNALED_BIT
+	};
+
+	for (size_t i = 0; i < MAX_FRAME_DRAWS; i++)
+	{
+		if (vkCreateSemaphore(mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphores_[i]) != VK_SUCCESS ||
+			vkCreateSemaphore(mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphores_[i]) != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create a semaphore.");
+		}
+
+		if (vkCreateFence(mainDevice.logicalDevice, &fenceCreateInfo, nullptr, &drawFences_[i]) != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create a fence.");
+		}
+	}
+}
+
 
 bool VulcanRenderer::CheckInstanceExtensionSupport(std::vector<const char*> extensions)
 {
@@ -706,8 +799,7 @@ void VulcanRenderer::RecordCommands()
 {
 	VkCommandBufferBeginInfo commandBufferBeginInfo
 	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO
 	};
 
 	VkClearValue clearValues[]
@@ -742,12 +834,12 @@ void VulcanRenderer::RecordCommands()
 		}
 
 		vkCmdBeginRenderPass(commandBuffers_[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
 		{
 			vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
 			vkCmdDraw(commandBuffers_[i], 3, 1, 0, 0);
 		}
+		vkCmdEndRenderPass(commandBuffers_[i]);
 
 		result = vkEndCommandBuffer(commandBuffers_[i]);
 		if (result != VK_SUCCESS)

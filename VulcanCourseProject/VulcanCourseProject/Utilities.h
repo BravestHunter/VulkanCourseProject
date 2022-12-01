@@ -5,10 +5,11 @@
 #include <fstream>
 
 
+const int MAX_FRAME_DRAWS = 2;
+
 const std::vector<const char*> deviceExtensions = 
 {
-	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-	//VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
 
