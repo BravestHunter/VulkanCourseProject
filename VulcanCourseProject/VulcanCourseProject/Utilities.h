@@ -4,6 +4,8 @@
 #include <string>
 #include <fstream>
 
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
 
@@ -54,22 +56,12 @@ struct Vertex
 	glm::vec3 color;
 };
 
-static std::vector<char> readBinaryFile(const std::string& filename)
-{
-	std::ifstream file(filename, std::ios::binary | std::ios::ate);
+std::vector<char> readBinaryFile(const std::string& filename);
 
-	if (file.is_open() == false)
-	{
-		throw std::runtime_error("Failed to open a file.");
-	}
+uint32_t findMemoryTypeIndex(VkPhysicalDevice physicalDevice, const uint32_t& allowedTypes, const VkMemoryPropertyFlags& propertyFlags);
 
-	size_t fileSize = static_cast<size_t>(file.tellg());
-	std::vector<char> buffer(fileSize);
+void createBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage,
+	VkMemoryPropertyFlags bufferProperties, VkBuffer* buffer, VkDeviceMemory* bufferMemory);
 
-	file.seekg(0);
-	file.read(buffer.data(), fileSize);
-
-	file.close();
-
-	return buffer;
-}
+void copyBuffer(VkDevice device, VkQueue transferQueue, VkCommandPool transferCommandPool, 
+	VkBuffer sourceBuffer, VkBuffer destinationBuffer, VkDeviceSize bufferSize);

@@ -13,24 +13,28 @@ int VulcanRenderer::Init(GLFWwindow* window)
 		CreateSurface(window);
 		GetPhysicalDevice();
 		CreateLogicalDevice();
-
-		std::vector<Vertex> meshVertices
-		{
-			Vertex { {0.4f, -0.4f, 0.0f}, {1.0f, 0.0f, 0.0f} },
-			Vertex { {0.4f, 0.4f, 0.0f}, {0.0f, 1.0f, 0.0f} },
-			Vertex { {-0.4f, 0.4f, 0.0f}, {0.0f, 0.0f, 1.0f} },
-
-			Vertex { {-0.4f, 0.4f, 0.0f}, {1.0f, 1.0f, 0.0f} },
-			Vertex { {-0.4f, -0.4f, 0.0f}, {1.0f, 0.0f, 1.0f} },
-			Vertex { {0.4f, -0.4f, 0.0f}, {0.0, 1.0f, 1.0f} }
-		};
-		mesh_ = std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, meshVertices);
-
 		CreateSwapchain();
 		CreateRenderPass();
 		CreateCraphicsPipeline();
 		CreateFramebuffers();
 		CreateCommandPool();
+
+		std::vector<Vertex> meshVertices
+		{
+			Vertex { {0.4f, -0.4f, 0.0f}, {1.0f, 0.0f, 0.0f} }, // top right
+			Vertex { {0.4f, 0.4f, 0.0f}, {0.0f, 1.0f, 0.0f} },  // bottom right
+			Vertex { {-0.4f, 0.4f, 0.0f}, {0.0f, 0.0f, 1.0f} }, // bottom left
+			Vertex { {-0.4f, -0.4f, 0.0f}, {1.0f, 0.0f, 1.0f} } // top left
+		};
+		std::vector<uint32_t> meshIndices
+		{
+			0, 1, 2,
+			2, 3, 0
+		};
+		mesh_ = std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue_, 
+			graphicsCommandPool_, meshVertices, meshIndices);
+		// (Usually graphics queue = transfer queue)
+
 		CreateCommandBuffers();
 		RecordCommands();
 		CreateSynchronization();
@@ -48,7 +52,7 @@ void VulcanRenderer::Deinit()
 {
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
 
-	mesh_->DestroyVertexBuffer();
+	mesh_->DestroyBuffers();
 
 	for (size_t i = 0; i < MAX_FRAME_DRAWS; i++)
 	{
@@ -883,7 +887,10 @@ void VulcanRenderer::RecordCommands()
 			VkDeviceSize offsets[] = { 0 };
 			vkCmdBindVertexBuffers(commandBuffers_[i], 0, 1, vertexBuffers, offsets);
 
-			vkCmdDraw(commandBuffers_[i], mesh_->GetVertexCount(), 1, 0, 0);
+			vkCmdBindIndexBuffer(commandBuffers_[i], mesh_->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+			//vkCmdDraw(commandBuffers_[i], mesh_->GetVertexCount(), 1, 0, 0);
+			vkCmdDrawIndexed(commandBuffers_[i], mesh_->GetIndexCount(), 1, 0, 0, 0);
 		}
 		vkCmdEndRenderPass(commandBuffers_[i]);
 
