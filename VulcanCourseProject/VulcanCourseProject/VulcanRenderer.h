@@ -49,7 +49,7 @@ private:
 	std::vector<VkSemaphore> renderFinishedSemaphores_;
 	std::vector<VkFence> drawFences_;
 
-	std::unique_ptr<Mesh> mesh_;
+	std::vector<std::unique_ptr<Mesh>> meshes_;
 
 	void CreateVkInstance();
 	void GetPhysicalDevice();
@@ -70,6 +70,7 @@ private:
 	bool CheckPhysicalDeviceSuitable(VkPhysicalDevice device);
 
 	void RecordCommands();
+	void CreateMeshes();
 
 	QueueFamilyIndices GetQueueFamilies(VkPhysicalDevice device);
 	SwapchainDetails GetSwapchainDetails(VkPhysicalDevice device);

@@ -19,21 +19,7 @@ int VulcanRenderer::Init(GLFWwindow* window)
 		CreateFramebuffers();
 		CreateCommandPool();
 
-		std::vector<Vertex> meshVertices
-		{
-			Vertex { {0.4f, -0.4f, 0.0f}, {1.0f, 0.0f, 0.0f} }, // top right
-			Vertex { {0.4f, 0.4f, 0.0f}, {0.0f, 1.0f, 0.0f} },  // bottom right
-			Vertex { {-0.4f, 0.4f, 0.0f}, {0.0f, 0.0f, 1.0f} }, // bottom left
-			Vertex { {-0.4f, -0.4f, 0.0f}, {1.0f, 0.0f, 1.0f} } // top left
-		};
-		std::vector<uint32_t> meshIndices
-		{
-			0, 1, 2,
-			2, 3, 0
-		};
-		mesh_ = std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue_, 
-			graphicsCommandPool_, meshVertices, meshIndices);
-		// (Usually graphics queue = transfer queue)
+		CreateMeshes();
 
 		CreateCommandBuffers();
 		RecordCommands();
@@ -52,7 +38,10 @@ void VulcanRenderer::Deinit()
 {
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
 
-	mesh_->DestroyBuffers();
+	for (auto& mesh : meshes_)
+	{
+		mesh->DestroyBuffers();
+	}
 
 	for (size_t i = 0; i < MAX_FRAME_DRAWS; i++)
 	{
@@ -883,14 +872,16 @@ void VulcanRenderer::RecordCommands()
 		{
 			vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
-			VkBuffer vertexBuffers[] = { mesh_->GetVertexBuffer() };
-			VkDeviceSize offsets[] = { 0 };
-			vkCmdBindVertexBuffers(commandBuffers_[i], 0, 1, vertexBuffers, offsets);
+			for (const std::unique_ptr<Mesh>& mesh : meshes_)
+			{
+				VkBuffer vertexBuffers[] = { mesh->GetVertexBuffer() };
+				VkDeviceSize offsets[] = { 0 };
+				vkCmdBindVertexBuffers(commandBuffers_[i], 0, 1, vertexBuffers, offsets);
 
-			vkCmdBindIndexBuffer(commandBuffers_[i], mesh_->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+				vkCmdBindIndexBuffer(commandBuffers_[i], mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-			//vkCmdDraw(commandBuffers_[i], mesh_->GetVertexCount(), 1, 0, 0);
-			vkCmdDrawIndexed(commandBuffers_[i], mesh_->GetIndexCount(), 1, 0, 0, 0);
+				vkCmdDrawIndexed(commandBuffers_[i], mesh->GetIndexCount(), 1, 0, 0, 0);
+			}
 		}
 		vkCmdEndRenderPass(commandBuffers_[i]);
 
@@ -900,6 +891,66 @@ void VulcanRenderer::RecordCommands()
 			throw std::runtime_error("Failed to stop recording a command buffer.");
 		}
 	}
+}
+
+void VulcanRenderer::CreateMeshes()
+{
+	std::vector<Vertex> meshVertices1
+	{
+		Vertex { {-0.4f, -0.8f, 0.0f}, {1.0f, 0.0f, 0.0f} }, // top right
+		Vertex { {-0.4f, -0.4f, 0.0f}, {0.0f, 1.0f, 0.0f} }, // bottom right
+		Vertex { {-0.8f, -0.4f, 0.0f}, {0.0f, 0.0f, 1.0f} }, // bottom left
+		Vertex { {-0.8f, -0.8f, 0.0f}, {1.0f, 0.0f, 1.0f} }  // top left
+	};
+
+	std::vector<Vertex> meshVertices2
+	{
+		Vertex { {0.8f, -0.8f, 0.0f}, {1.0f, 0.0f, 0.0f} }, // top right
+		Vertex { {0.8f, -0.4f, 0.0f}, {0.0f, 1.0f, 0.0f} }, // bottom right
+		Vertex { {0.4f, -0.4f, 0.0f}, {0.0f, 0.0f, 1.0f} }, // bottom left
+		Vertex { {0.4f, -0.8f, 0.0f}, {1.0f, 0.0f, 1.0f} }  // top left
+	};
+
+	std::vector<Vertex> meshVertices3
+	{
+		Vertex { {-0.4f, 0.4f, 0.0f}, {1.0f, 0.0f, 0.0f} }, // top right
+		Vertex { {-0.4f, 0.8f, 0.0f}, {0.0f, 1.0f, 0.0f} }, // bottom right
+		Vertex { {-0.8f, 0.8f, 0.0f}, {0.0f, 0.0f, 1.0f} }, // bottom left
+		Vertex { {-0.8f, 0.4f, 0.0f}, {1.0f, 0.0f, 1.0f} }  // top left
+	};
+
+	std::vector<Vertex> meshVertices4
+	{
+		Vertex { {0.8f, 0.4f, 0.0f}, {1.0f, 0.0f, 0.0f} }, // top right
+		Vertex { {0.8f, 0.8f, 0.0f}, {0.0f, 1.0f, 0.0f} }, // bottom right
+		Vertex { {0.4f, 0.8f, 0.0f}, {0.0f, 0.0f, 1.0f} }, // bottom left
+		Vertex { {0.4f, 0.4f, 0.0f}, {1.0f, 0.0f, 1.0f} }  // top left
+	};
+
+	std::vector<uint32_t> meshIndices
+	{
+		0, 1, 2,
+		2, 3, 0
+	};
+
+	// (Usually graphics queue = transfer queue)
+
+	meshes_.push_back(
+		std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue_, 
+			graphicsCommandPool_, meshVertices1, meshIndices)
+	);
+	meshes_.push_back(
+		std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue_,
+			graphicsCommandPool_, meshVertices2, meshIndices)
+	);
+	meshes_.push_back(
+		std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue_,
+			graphicsCommandPool_, meshVertices3, meshIndices)
+	);
+	meshes_.push_back(
+		std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue_,
+			graphicsCommandPool_, meshVertices4, meshIndices)
+	);
 }
 
 
