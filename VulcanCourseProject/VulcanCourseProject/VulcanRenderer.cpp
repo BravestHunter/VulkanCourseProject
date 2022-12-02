@@ -15,13 +15,21 @@ int VulcanRenderer::Init(GLFWwindow* window)
 		CreateLogicalDevice();
 		CreateSwapchain();
 		CreateRenderPass();
+		CreateDescriptorSetLayout();
 		CreateCraphicsPipeline();
 		CreateFramebuffers();
 		CreateCommandPool();
 
 		CreateMeshes();
+		mvp.projection = glm::perspective(glm::radians(45.0f), (float)swapchainExtent_.width / swapchainExtent_.height, 0.1f, 1000.0f);
+		mvp.projection[1][1] *= -1.0f;
+		mvp.view = glm::lookAt(glm::vec3(3.0f, 1.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		mvp.model = glm::mat4(1.0f);
 
 		CreateCommandBuffers();
+		CreateUniformBuffers();
+		CreateDescriptorPool();
+		CreateDescriptorSets();
 		RecordCommands();
 		CreateSynchronization();
 	}
@@ -43,18 +51,26 @@ void VulcanRenderer::Deinit()
 		mesh->DestroyBuffers();
 	}
 
+	vkDestroyDescriptorPool(mainDevice.logicalDevice, descriptorPool_, nullptr);
+	vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, descriptorSetLayout_, nullptr);
+	for (size_t i = 0; i < uniformBuffer_.size(); i++)
+	{
+		vkDestroyBuffer(mainDevice.logicalDevice, uniformBuffer_[i], nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, uniformBufferMemory_[i], nullptr);
+	}
+
 	for (size_t i = 0; i < MAX_FRAME_DRAWS; i++)
 	{
 		vkDestroySemaphore(mainDevice.logicalDevice, renderFinishedSemaphores_[i], nullptr);
 		vkDestroySemaphore(mainDevice.logicalDevice, imageAvailableSemaphores_[i], nullptr);
 		vkDestroyFence(mainDevice.logicalDevice, drawFences_[i], nullptr);
 	}
-	vkDestroyCommandPool(mainDevice.logicalDevice, graphicsCommandPool_, nullptr);
 
 	for (VkFramebuffer framebuffer : swapchainFramebuffers_)
 	{
 		vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
 	}
+	vkDestroyCommandPool(mainDevice.logicalDevice, graphicsCommandPool_, nullptr);
 
 	vkDestroyPipeline(mainDevice.logicalDevice, graphicsPipeline_, nullptr);
 	vkDestroyPipelineLayout(mainDevice.logicalDevice, pipelineLayout_, nullptr);
@@ -79,6 +95,8 @@ void VulcanRenderer::Draw()
 
 	uint32_t imageIndex;
 	vkAcquireNextImageKHR(mainDevice.logicalDevice, swapchain_, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores_[currentFrame_], VK_NULL_HANDLE, &imageIndex);
+
+	UpdateUniformBuffer(imageIndex);
 
 	VkPipelineStageFlags waitStageFlags[]
 	{
@@ -402,6 +420,31 @@ void VulcanRenderer::CreateRenderPass()
 	}
 }
 
+void VulcanRenderer::CreateDescriptorSetLayout()
+{
+	VkDescriptorSetLayoutBinding mvpLayoutBinding
+	{
+		.binding = 0,
+		.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		.descriptorCount = 1,
+		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		.pImmutableSamplers = nullptr
+	};
+
+	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.bindingCount = 1,
+		.pBindings = &mvpLayoutBinding
+	};
+
+	VkResult result = vkCreateDescriptorSetLayout(mainDevice.logicalDevice, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout_);
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create a descriptor set.");
+	}
+}
+
 void VulcanRenderer::CreateCraphicsPipeline()
 {
 	std::vector<char> vertexShaderCode = readBinaryFile("../shaders/vert.spv");
@@ -518,8 +561,7 @@ void VulcanRenderer::CreateCraphicsPipeline()
 		.rasterizerDiscardEnable = VK_FALSE,
 		.polygonMode = VK_POLYGON_MODE_FILL,
 		.cullMode = VK_CULL_MODE_BACK_BIT,
-		//.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-		.frontFace = VK_FRONT_FACE_CLOCKWISE,
+		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
 		.depthBiasEnable = VK_FALSE,
 		.lineWidth = 1.0f
 	};
@@ -560,8 +602,8 @@ void VulcanRenderer::CreateCraphicsPipeline()
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount = 0,
-		.pSetLayouts = nullptr,
+		.setLayoutCount = 1,
+		.pSetLayouts = &descriptorSetLayout_,
 		.pushConstantRangeCount = 0,
 		.pPushConstantRanges = nullptr
 	};
@@ -669,7 +711,7 @@ void VulcanRenderer::CreateCommandBuffers()
 	VkResult result = vkAllocateCommandBuffers(mainDevice.logicalDevice, &commandBufferAllocateInfo, commandBuffers_.data());
 	if (result != VK_SUCCESS)
 	{
-		throw std::runtime_error("Failed to acllocate command buffers.");
+		throw std::runtime_error("Failed to allocate command buffers.");
 	}
 }
 
@@ -702,6 +744,86 @@ void VulcanRenderer::CreateSynchronization()
 		{
 			throw std::runtime_error("Failed to create a fence.");
 		}
+	}
+}
+
+void VulcanRenderer::CreateUniformBuffers()
+{
+	VkDeviceSize buffersSize = sizeof(MVP);
+
+	uniformBuffer_.resize(swapchainImages_.size());
+	uniformBufferMemory_.resize(swapchainImages_.size());
+	for (size_t i = 0; i < uniformBuffer_.size(); i++)
+	{
+		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, buffersSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer_[i], &uniformBufferMemory_[i]);
+	}
+}
+
+void VulcanRenderer::CreateDescriptorPool()
+{
+	VkDescriptorPoolSize descriptorPoolSize
+	{
+		.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		.descriptorCount = static_cast<uint32_t>(uniformBuffer_.size())
+	};
+
+	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		.maxSets = static_cast<uint32_t>(uniformBuffer_.size()),
+		.poolSizeCount = 1,
+		.pPoolSizes = &descriptorPoolSize
+	};
+
+	VkResult result = vkCreateDescriptorPool(mainDevice.logicalDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool_);
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create a descriptor pool.");
+	}
+}
+
+void VulcanRenderer::CreateDescriptorSets()
+{
+	std::vector<VkDescriptorSetLayout> descriptorSetLayouts(uniformBuffer_.size(), descriptorSetLayout_);
+
+	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		.descriptorPool = descriptorPool_,
+		.descriptorSetCount = static_cast<uint32_t>(uniformBuffer_.size()),
+		.pSetLayouts = descriptorSetLayouts.data()
+	};
+
+	descriptorSets_.resize(uniformBuffer_.size());
+
+	VkResult result = vkAllocateDescriptorSets(mainDevice.logicalDevice, &descriptorSetAllocateInfo, descriptorSets_.data());
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to allocate descriptor sets.");
+	}
+
+	for (size_t i = 0; i < descriptorSets_.size(); i++)
+	{
+		VkDescriptorBufferInfo mvpBufferInfo
+		{
+			.buffer = uniformBuffer_[i],
+			.offset = 0,
+			.range = sizeof(MVP)
+		};
+
+		VkWriteDescriptorSet mvpSetWrite
+		{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = descriptorSets_[i],
+			.dstBinding = 0,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.pBufferInfo = &mvpBufferInfo
+		};
+
+		vkUpdateDescriptorSets(mainDevice.logicalDevice, 1, &mvpSetWrite, 0, nullptr);
 	}
 }
 
@@ -880,6 +1002,8 @@ void VulcanRenderer::RecordCommands()
 
 				vkCmdBindIndexBuffer(commandBuffers_[i], mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
+				vkCmdBindDescriptorSets(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[i], 0, nullptr);
+
 				vkCmdDrawIndexed(commandBuffers_[i], mesh->GetIndexCount(), 1, 0, 0, 0);
 			}
 		}
@@ -891,6 +1015,14 @@ void VulcanRenderer::RecordCommands()
 			throw std::runtime_error("Failed to stop recording a command buffer.");
 		}
 	}
+}
+
+void VulcanRenderer::UpdateUniformBuffer(uint32_t imageIndex)
+{
+	void* data;
+	vkMapMemory(mainDevice.logicalDevice, uniformBufferMemory_[imageIndex], 0, sizeof(MVP), 0, &data);
+	memcpy(data, &mvp, sizeof(MVP));
+	vkUnmapMemory(mainDevice.logicalDevice, uniformBufferMemory_[imageIndex]);
 }
 
 void VulcanRenderer::CreateMeshes()

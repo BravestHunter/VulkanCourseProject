@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 
+#include <glm/gtc/matrix_transform.hpp>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -18,6 +19,8 @@ public:
 	void Deinit();
 
 	void Draw();
+
+	void UpdateModel(glm::mat4 model);
 
 private:
 	int currentFrame_ = 0;
@@ -36,6 +39,14 @@ private:
 	std::vector<VkFramebuffer> swapchainFramebuffers_;
 	std::vector<VkCommandBuffer> commandBuffers_;
 
+	VkDescriptorSetLayout descriptorSetLayout_;
+
+	std::vector<VkBuffer> uniformBuffer_;
+	std::vector<VkDeviceMemory> uniformBufferMemory_;
+
+	VkDescriptorPool descriptorPool_;
+	std::vector<VkDescriptorSet> descriptorSets_;
+
 	VkPipeline graphicsPipeline_;
 	VkPipelineLayout pipelineLayout_;
 	VkRenderPass renderPass_;
@@ -51,17 +62,27 @@ private:
 
 	std::vector<std::unique_ptr<Mesh>> meshes_;
 
+	struct MVP {
+		glm::mat4 projection;
+		glm::mat4 view;
+		glm::mat4 model;
+	} mvp;
+
 	void CreateVkInstance();
 	void GetPhysicalDevice();
 	void CreateLogicalDevice();
 	void CreateSurface(GLFWwindow* window);
 	void CreateSwapchain();
 	void CreateRenderPass();
+	void CreateDescriptorSetLayout();
 	void CreateCraphicsPipeline();
 	void CreateFramebuffers();
 	void CreateCommandPool();
 	void CreateCommandBuffers();
 	void CreateSynchronization();
+	void CreateUniformBuffers();
+	void CreateDescriptorPool();
+	void CreateDescriptorSets();
 
 	bool CheckInstanceExtensionSupport(std::vector<const char*> extensions);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
@@ -70,6 +91,7 @@ private:
 	bool CheckPhysicalDeviceSuitable(VkPhysicalDevice device);
 
 	void RecordCommands();
+	void UpdateUniformBuffer(uint32_t imageIndex);
 	void CreateMeshes();
 
 	QueueFamilyIndices GetQueueFamilies(VkPhysicalDevice device);
@@ -82,3 +104,9 @@ private:
 	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
 };
+
+
+inline void VulcanRenderer::UpdateModel(glm::mat4 model)
+{
+	mvp.model = model;
+}
