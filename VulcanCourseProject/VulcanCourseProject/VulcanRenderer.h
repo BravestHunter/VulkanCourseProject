@@ -39,6 +39,11 @@ private:
 	std::vector<VkFramebuffer> swapchainFramebuffers_;
 	std::vector<VkCommandBuffer> commandBuffers_;
 
+	VkFormat depthBufferImageFormat_;
+	VkImage depthBufferImage_;
+	VkDeviceMemory depthBufferImageMemory_;
+	VkImageView depthBufferImageView_;
+
 	VkDescriptorSetLayout descriptorSetLayout_;
 	VkPushConstantRange pushConstantRange_;
 
@@ -84,6 +89,7 @@ private:
 	void CreateDescriptorSetLayout();
 	void CreatePushConstantRange();
 	void CreateCraphicsPipeline();
+	void CreateDepthBufferImage();
 	void CreateFramebuffers();
 	void CreateCommandPool();
 	void CreateCommandBuffers();
@@ -108,7 +114,10 @@ private:
 	VkSurfaceFormatKHR ChooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
 	VkPresentModeKHR ChooseBestPresentationMode(const std::vector<VkPresentModeKHR>& presentationModes);
 	VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities);
+	VkFormat ChooseSupportedFormat(const std::vector<VkFormat>& formats, const VkImageTiling tiling, const VkFormatFeatureFlags featureFlags);
 
+	VkImage CreateImage(const uint32_t width, const uint32_t height, const VkFormat format, const VkImageTiling tiling, 
+		const VkImageUsageFlags useFlags, const VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory);
 	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
 
