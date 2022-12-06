@@ -8,7 +8,7 @@
 #include "Utilities.h"
 
 
-struct UboModel
+struct Model
 {
 	glm::mat4 model;
 };
@@ -19,8 +19,8 @@ public:
 	Mesh(const VkPhysicalDevice physicalDevice, const VkDevice& device, const VkQueue& transferQueue, 
 		const VkCommandPool& transferCommandPool, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
 
-	void SetModel(const UboModel& model);
-	const UboModel& GetModel() const;
+	void SetModel(const Model& model);
+	const Model& GetModel() const;
 
 	VkBuffer GetVertexBuffer() const;
 	size_t GetVertexCount() const;
@@ -31,7 +31,7 @@ public:
 	void DestroyBuffers();
 
 private:
-	UboModel uboModel_;
+	Model model_;
 
 	VkPhysicalDevice physicalDevice_;
 	VkDevice device_;
@@ -49,14 +49,14 @@ private:
 };
 
 
-inline void Mesh::SetModel(const UboModel& model)
+inline void Mesh::SetModel(const Model& model)
 {
-	uboModel_ = model;
+	model_ = model;
 }
 
-inline const UboModel& Mesh::GetModel() const
+inline const Model& Mesh::GetModel() const
 {
-	return uboModel_;
+	return model_;
 }
 
 inline size_t Mesh::GetVertexCount() const

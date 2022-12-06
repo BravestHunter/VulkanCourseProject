@@ -40,6 +40,7 @@ private:
 	std::vector<VkCommandBuffer> commandBuffers_;
 
 	VkDescriptorSetLayout descriptorSetLayout_;
+	VkPushConstantRange pushConstantRange_;
 
 	std::vector<VkBuffer> vpUniformBuffer_;
 	std::vector<VkDeviceMemory> vpUniformBufferMemory_;
@@ -47,9 +48,9 @@ private:
 	std::vector<VkBuffer> modelDynamicUniformBuffer_;
 	std::vector<VkDeviceMemory> modelDynamicUniformBufferMemory_;
 
-	VkDeviceSize minUniformBufferOffset_;
-	size_t modelUniformAlignment_;
-	UboModel* modelTransferSpace_;
+	//VkDeviceSize minUniformBufferOffset_;
+	//size_t modelUniformAlignment_;
+	//Model* modelTransferSpace_;
 
 	VkDescriptorPool descriptorPool_;
 	std::vector<VkDescriptorSet> descriptorSets_;
@@ -81,6 +82,7 @@ private:
 	void CreateSwapchain();
 	void CreateRenderPass();
 	void CreateDescriptorSetLayout();
+	void CreatePushConstantRange();
 	void CreateCraphicsPipeline();
 	void CreateFramebuffers();
 	void CreateCommandPool();
@@ -96,7 +98,7 @@ private:
 	bool CheckValidationLayerSupport(std::vector<const char*> layers);
 	bool CheckPhysicalDeviceSuitable(VkPhysicalDevice device);
 
-	void RecordCommands();
+	void RecordCommands(uint32_t imageIndex);
 	void UpdateUniformBuffers(uint32_t imageIndex);
 	void CreateMeshes();
 
