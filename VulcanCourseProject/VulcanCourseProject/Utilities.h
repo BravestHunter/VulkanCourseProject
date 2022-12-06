@@ -10,6 +10,7 @@
 
 
 const int MAX_FRAME_DRAWS = 2;
+const int MAX_OBJECTS = 4;
 
 const std::vector<const char*> deviceExtensions = 
 {

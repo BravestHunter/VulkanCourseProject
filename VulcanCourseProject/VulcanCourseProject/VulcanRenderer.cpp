@@ -12,6 +12,7 @@ int VulcanRenderer::Init(GLFWwindow* window)
 		CreateVkInstance();
 		CreateSurface(window);
 		GetPhysicalDevice();
+		AllocateDynamicBufferTransferSpace();
 		CreateLogicalDevice();
 		CreateSwapchain();
 		CreateRenderPass();
@@ -21,16 +22,15 @@ int VulcanRenderer::Init(GLFWwindow* window)
 		CreateCommandPool();
 
 		CreateMeshes();
-		mvp.projection = glm::perspective(glm::radians(45.0f), (float)swapchainExtent_.width / swapchainExtent_.height, 0.1f, 1000.0f);
-		mvp.projection[1][1] *= -1.0f;
-		mvp.view = glm::lookAt(glm::vec3(3.0f, 1.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		mvp.model = glm::mat4(1.0f);
+		uboViewProjection_.projection = glm::perspective(glm::radians(45.0f), (float)swapchainExtent_.width / swapchainExtent_.height, 0.1f, 1000.0f);
+		uboViewProjection_.projection[1][1] *= -1.0f;
+		uboViewProjection_.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 		CreateCommandBuffers();
 		CreateUniformBuffers();
 		CreateDescriptorPool();
 		CreateDescriptorSets();
-		RecordCommands();
+ 		RecordCommands();
 		CreateSynchronization();
 	}
 	catch (const std::runtime_error &e)
@@ -46,6 +46,8 @@ void VulcanRenderer::Deinit()
 {
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
 
+	_aligned_free(modelTransferSpace_);
+
 	for (auto& mesh : meshes_)
 	{
 		mesh->DestroyBuffers();
@@ -53,10 +55,13 @@ void VulcanRenderer::Deinit()
 
 	vkDestroyDescriptorPool(mainDevice.logicalDevice, descriptorPool_, nullptr);
 	vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, descriptorSetLayout_, nullptr);
-	for (size_t i = 0; i < uniformBuffer_.size(); i++)
+	for (size_t i = 0; i < swapchainImages_.size(); i++)
 	{
-		vkDestroyBuffer(mainDevice.logicalDevice, uniformBuffer_[i], nullptr);
-		vkFreeMemory(mainDevice.logicalDevice, uniformBufferMemory_[i], nullptr);
+		vkDestroyBuffer(mainDevice.logicalDevice, vpUniformBuffer_[i], nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, vpUniformBufferMemory_[i], nullptr);
+
+		vkDestroyBuffer(mainDevice.logicalDevice, modelDynamicUniformBuffer_[i], nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, modelDynamicUniformBufferMemory_[i], nullptr);
 	}
 
 	for (size_t i = 0; i < MAX_FRAME_DRAWS; i++)
@@ -96,7 +101,7 @@ void VulcanRenderer::Draw()
 	uint32_t imageIndex;
 	vkAcquireNextImageKHR(mainDevice.logicalDevice, swapchain_, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores_[currentFrame_], VK_NULL_HANDLE, &imageIndex);
 
-	UpdateUniformBuffer(imageIndex);
+	UpdateUniformBuffers(imageIndex);
 
 	VkPipelineStageFlags waitStageFlags[]
 	{
@@ -138,6 +143,17 @@ void VulcanRenderer::Draw()
 	}
 
 	currentFrame_ = (currentFrame_ + 1) % MAX_FRAME_DRAWS; 
+}
+
+
+void VulcanRenderer::UpdateModel(const int& index, const glm::mat4& model)
+{
+	if (index < 0 || index >= meshes_.size())
+	{
+		return;
+	}
+
+	meshes_[index]->SetModel({ model });
 }
 
 
@@ -220,6 +236,10 @@ void VulcanRenderer::GetPhysicalDevice()
 			break;
 		}
 	}
+
+	VkPhysicalDeviceProperties properties;
+	vkGetPhysicalDeviceProperties(mainDevice.physicalDevice, &properties);
+	minUniformBufferOffset_ = properties.limits.minUniformBufferOffsetAlignment;
 }
 
 void VulcanRenderer::CreateLogicalDevice()
@@ -422,7 +442,7 @@ void VulcanRenderer::CreateRenderPass()
 
 void VulcanRenderer::CreateDescriptorSetLayout()
 {
-	VkDescriptorSetLayoutBinding mvpLayoutBinding
+	VkDescriptorSetLayoutBinding vpLayoutBinding
 	{
 		.binding = 0,
 		.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -430,12 +450,21 @@ void VulcanRenderer::CreateDescriptorSetLayout()
 		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
 		.pImmutableSamplers = nullptr
 	};
+	VkDescriptorSetLayoutBinding modelLayoutBinding
+	{
+		.binding = 1,
+		.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+		.descriptorCount = 1,
+		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		.pImmutableSamplers = nullptr
+	};
+	std::vector<VkDescriptorSetLayoutBinding> layoutBindings { vpLayoutBinding, modelLayoutBinding };
 
 	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.bindingCount = 1,
-		.pBindings = &mvpLayoutBinding
+		.bindingCount = static_cast<uint32_t>(layoutBindings.size()),
+		.pBindings = layoutBindings.data()
 	};
 
 	VkResult result = vkCreateDescriptorSetLayout(mainDevice.logicalDevice, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout_);
@@ -749,31 +778,44 @@ void VulcanRenderer::CreateSynchronization()
 
 void VulcanRenderer::CreateUniformBuffers()
 {
-	VkDeviceSize buffersSize = sizeof(MVP);
+	VkDeviceSize vpBuffersSize = sizeof(UboViewProjection);
+	VkDeviceSize modelBuffersSize = modelUniformAlignment_ * MAX_OBJECTS;
 
-	uniformBuffer_.resize(swapchainImages_.size());
-	uniformBufferMemory_.resize(swapchainImages_.size());
-	for (size_t i = 0; i < uniformBuffer_.size(); i++)
+	vpUniformBuffer_.resize(swapchainImages_.size());
+	vpUniformBufferMemory_.resize(swapchainImages_.size());
+	modelDynamicUniformBuffer_.resize(swapchainImages_.size());
+	modelDynamicUniformBufferMemory_.resize(swapchainImages_.size());
+
+	for (size_t i = 0; i < swapchainImages_.size(); i++)
 	{
-		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, buffersSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniformBuffer_[i], &uniformBufferMemory_[i]);
+		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, vpBuffersSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &vpUniformBuffer_[i], &vpUniformBufferMemory_[i]);
+
+		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, modelBuffersSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &modelDynamicUniformBuffer_[i], &modelDynamicUniformBufferMemory_[i]);
 	}
 }
 
 void VulcanRenderer::CreateDescriptorPool()
 {
-	VkDescriptorPoolSize descriptorPoolSize
+	VkDescriptorPoolSize vpDescriptorPoolSize
 	{
 		.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		.descriptorCount = static_cast<uint32_t>(uniformBuffer_.size())
+		.descriptorCount = static_cast<uint32_t>(vpUniformBuffer_.size())
 	};
+	VkDescriptorPoolSize modelDescriptorPoolSize
+	{
+		.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+		.descriptorCount = static_cast<uint32_t>(modelDynamicUniformBuffer_.size())
+	};
+	std::vector<VkDescriptorPoolSize> poolSizes { vpDescriptorPoolSize, modelDescriptorPoolSize };
 
 	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.maxSets = static_cast<uint32_t>(uniformBuffer_.size()),
-		.poolSizeCount = 1,
-		.pPoolSizes = &descriptorPoolSize
+		.maxSets = static_cast<uint32_t>(swapchainImages_.size()),
+		.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+		.pPoolSizes = poolSizes.data()
 	};
 
 	VkResult result = vkCreateDescriptorPool(mainDevice.logicalDevice, &descriptorPoolCreateInfo, nullptr, &descriptorPool_);
@@ -785,17 +827,17 @@ void VulcanRenderer::CreateDescriptorPool()
 
 void VulcanRenderer::CreateDescriptorSets()
 {
-	std::vector<VkDescriptorSetLayout> descriptorSetLayouts(uniformBuffer_.size(), descriptorSetLayout_);
+	std::vector<VkDescriptorSetLayout> descriptorSetLayouts(vpUniformBuffer_.size(), descriptorSetLayout_);
 
 	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
 		.descriptorPool = descriptorPool_,
-		.descriptorSetCount = static_cast<uint32_t>(uniformBuffer_.size()),
+		.descriptorSetCount = static_cast<uint32_t>(swapchainImages_.size()),
 		.pSetLayouts = descriptorSetLayouts.data()
 	};
 
-	descriptorSets_.resize(uniformBuffer_.size());
+	descriptorSets_.resize(swapchainImages_.size());
 
 	VkResult result = vkAllocateDescriptorSets(mainDevice.logicalDevice, &descriptorSetAllocateInfo, descriptorSets_.data());
 	if (result != VK_SUCCESS)
@@ -805,14 +847,20 @@ void VulcanRenderer::CreateDescriptorSets()
 
 	for (size_t i = 0; i < descriptorSets_.size(); i++)
 	{
-		VkDescriptorBufferInfo mvpBufferInfo
+		VkDescriptorBufferInfo vpBufferInfo
 		{
-			.buffer = uniformBuffer_[i],
+			.buffer = vpUniformBuffer_[i],
 			.offset = 0,
-			.range = sizeof(MVP)
+			.range = sizeof(UboViewProjection)
+		};
+		VkDescriptorBufferInfo modelBufferInfo
+		{
+			.buffer = modelDynamicUniformBuffer_[i],
+			.offset = 0,
+			.range = modelUniformAlignment_
 		};
 
-		VkWriteDescriptorSet mvpSetWrite
+		VkWriteDescriptorSet vpSetWrite
 		{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = descriptorSets_[i],
@@ -820,10 +868,21 @@ void VulcanRenderer::CreateDescriptorSets()
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.pBufferInfo = &mvpBufferInfo
+			.pBufferInfo = &vpBufferInfo
 		};
+		VkWriteDescriptorSet modelSetWrite
+		{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = descriptorSets_[i],
+			.dstBinding = 1,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+			.pBufferInfo = &modelBufferInfo
+		};
+		std::vector<VkWriteDescriptorSet> writeDescriptorSets { vpSetWrite, modelSetWrite };
 
-		vkUpdateDescriptorSets(mainDevice.logicalDevice, 1, &mvpSetWrite, 0, nullptr);
+		vkUpdateDescriptorSets(mainDevice.logicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
 }
 
@@ -994,15 +1053,17 @@ void VulcanRenderer::RecordCommands()
 		{
 			vkCmdBindPipeline(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
-			for (const std::unique_ptr<Mesh>& mesh : meshes_)
+			for (size_t j = 0; j < meshes_.size(); j++)
 			{
+				const std::unique_ptr<Mesh>& mesh = meshes_[j];
 				VkBuffer vertexBuffers[] = { mesh->GetVertexBuffer() };
 				VkDeviceSize offsets[] = { 0 };
 				vkCmdBindVertexBuffers(commandBuffers_[i], 0, 1, vertexBuffers, offsets);
 
 				vkCmdBindIndexBuffer(commandBuffers_[i], mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-				vkCmdBindDescriptorSets(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[i], 0, nullptr);
+				uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment_) * j;
+				vkCmdBindDescriptorSets(commandBuffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[i], 1, &dynamicOffset);
 
 				vkCmdDrawIndexed(commandBuffers_[i], mesh->GetIndexCount(), 1, 0, 0, 0);
 			}
@@ -1017,12 +1078,22 @@ void VulcanRenderer::RecordCommands()
 	}
 }
 
-void VulcanRenderer::UpdateUniformBuffer(uint32_t imageIndex)
+void VulcanRenderer::UpdateUniformBuffers(uint32_t imageIndex)
 {
 	void* data;
-	vkMapMemory(mainDevice.logicalDevice, uniformBufferMemory_[imageIndex], 0, sizeof(MVP), 0, &data);
-	memcpy(data, &mvp, sizeof(MVP));
-	vkUnmapMemory(mainDevice.logicalDevice, uniformBufferMemory_[imageIndex]);
+
+	vkMapMemory(mainDevice.logicalDevice, vpUniformBufferMemory_[imageIndex], 0, sizeof(UboViewProjection), 0, &data);
+	memcpy(data, &uboViewProjection_, sizeof(UboViewProjection));
+	vkUnmapMemory(mainDevice.logicalDevice, vpUniformBufferMemory_[imageIndex]);
+
+	for (size_t i = 0; i < meshes_.size(); i++)
+	{
+		UboModel* currentModel = (UboModel*)((uint64_t)modelTransferSpace_ + (i * modelUniformAlignment_));
+		*currentModel = meshes_[i]->GetModel();
+	}
+	vkMapMemory(mainDevice.logicalDevice, modelDynamicUniformBufferMemory_[imageIndex], 0, modelUniformAlignment_ * meshes_.size(), 0, &data);
+	memcpy(data, modelTransferSpace_, modelUniformAlignment_ * meshes_.size());
+	vkUnmapMemory(mainDevice.logicalDevice, modelDynamicUniformBufferMemory_[imageIndex]);
 }
 
 void VulcanRenderer::CreateMeshes()
@@ -1259,4 +1330,12 @@ VkShaderModule VulcanRenderer::CreateShaderModule(const std::vector<char>& code)
 	}
 
 	return shaderModule;
+}
+
+
+void VulcanRenderer::AllocateDynamicBufferTransferSpace()
+{
+	modelUniformAlignment_ = (sizeof(UboModel) + (minUniformBufferOffset_ - 1)) & ~(minUniformBufferOffset_ - 1);
+
+	modelTransferSpace_ = (UboModel*)_aligned_malloc(modelUniformAlignment_ * MAX_OBJECTS, modelUniformAlignment_);
 }

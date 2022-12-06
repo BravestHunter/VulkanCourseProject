@@ -2,6 +2,7 @@
 
 Mesh::Mesh(const VkPhysicalDevice physicalDevice, const VkDevice& device, const VkQueue& transferQueue, 
 	const VkCommandPool& transferCommandPool, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices) :
+	uboModel_({ glm::mat4(1.0f) }),
 	physicalDevice_(physicalDevice),
 	device_(device),
 	vertexCount_(vertices.size()),
