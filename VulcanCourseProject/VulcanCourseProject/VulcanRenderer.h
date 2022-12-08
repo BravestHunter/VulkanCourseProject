@@ -44,7 +44,10 @@ private:
 	VkDeviceMemory depthBufferImageMemory_;
 	VkImageView depthBufferImageView_;
 
+	VkSampler textureSampler_;
+
 	VkDescriptorSetLayout descriptorSetLayout_;
+	VkDescriptorSetLayout samplerDescriptorSetLayout_;
 	VkPushConstantRange pushConstantRange_;
 
 	std::vector<VkBuffer> vpUniformBuffer_;
@@ -58,7 +61,9 @@ private:
 	//Model* modelTransferSpace_;
 
 	VkDescriptorPool descriptorPool_;
+	VkDescriptorPool samplerDescriptorPool_;
 	std::vector<VkDescriptorSet> descriptorSets_;
+	std::vector<VkDescriptorSet> samplerDescriptorSets_;
 
 	VkPipeline graphicsPipeline_;
 	VkPipelineLayout pipelineLayout_;
@@ -72,6 +77,10 @@ private:
 	std::vector<VkSemaphore> imageAvailableSemaphores_;
 	std::vector<VkSemaphore> renderFinishedSemaphores_;
 	std::vector<VkFence> drawFences_;
+
+	std::vector<VkImage> textureImages_;
+	std::vector<VkDeviceMemory> textureImagesMemory_;
+	std::vector<VkImageView> textureImageViews_;
 
 	std::vector<std::unique_ptr<Mesh>> meshes_;
 
@@ -95,8 +104,9 @@ private:
 	void CreateCommandBuffers();
 	void CreateSynchronization();
 	void CreateUniformBuffers();
-	void CreateDescriptorPool();
+	void CreateDescriptorPools();
 	void CreateDescriptorSets();
+	void CreateTextureSampler();
 
 	bool CheckInstanceExtensionSupport(std::vector<const char*> extensions);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
@@ -106,7 +116,7 @@ private:
 
 	void RecordCommands(uint32_t imageIndex);
 	void UpdateUniformBuffers(uint32_t imageIndex);
-	void CreateMeshes();
+	void CreateAssets();
 
 	QueueFamilyIndices GetQueueFamilies(VkPhysicalDevice device);
 	SwapchainDetails GetSwapchainDetails(VkPhysicalDevice device);
@@ -122,4 +132,8 @@ private:
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
 
 	void AllocateDynamicBufferTransferSpace();
+
+	int CreateTextureImage(std::string fileName);
+	int CreateTextureDescriptor(VkImageView textureImage);
+	int CreateTexture(std::string fileName);
 };

@@ -1,8 +1,9 @@
 #include "Mesh.h"
 
 Mesh::Mesh(const VkPhysicalDevice physicalDevice, const VkDevice& device, const VkQueue& transferQueue, 
-	const VkCommandPool& transferCommandPool, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices) :
+	const VkCommandPool& transferCommandPool, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, int textureId) :
 	model_({ glm::mat4(1.0f) }),
+	textureId_(textureId),
 	physicalDevice_(physicalDevice),
 	device_(device),
 	vertexCount_(vertices.size()),

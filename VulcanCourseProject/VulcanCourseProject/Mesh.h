@@ -17,14 +17,14 @@ class Mesh
 {
 public:
 	Mesh(const VkPhysicalDevice physicalDevice, const VkDevice& device, const VkQueue& transferQueue, 
-		const VkCommandPool& transferCommandPool, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+		const VkCommandPool& transferCommandPool, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, int textureId);
 
 	void SetModel(const Model& model);
 	const Model& GetModel() const;
+	const int GetTextureId() const;
 
 	VkBuffer GetVertexBuffer() const;
 	size_t GetVertexCount() const;
-
 	VkBuffer GetIndexBuffer() const;
 	size_t GetIndexCount() const;
 
@@ -32,6 +32,7 @@ public:
 
 private:
 	Model model_;
+	int textureId_;
 
 	VkPhysicalDevice physicalDevice_;
 	VkDevice device_;
@@ -59,14 +60,20 @@ inline const Model& Mesh::GetModel() const
 	return model_;
 }
 
-inline size_t Mesh::GetVertexCount() const
+inline const int Mesh::GetTextureId() const
 {
-	return vertexCount_;
+	return textureId_;
 }
+
 
 inline VkBuffer Mesh::GetVertexBuffer() const
 {
 	return vertexBuffer_;
+}
+
+inline size_t Mesh::GetVertexCount() const
+{
+	return vertexCount_;
 }
 
 inline VkBuffer Mesh::GetIndexBuffer() const
