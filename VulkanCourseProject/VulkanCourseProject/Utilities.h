@@ -13,7 +13,7 @@
 
 
 const int MAX_FRAME_DRAWS = 2;
-const int MAX_OBJECTS = 4;
+const int MAX_OBJECTS = 32;
 
 const std::vector<const char*> deviceExtensions = 
 {
@@ -63,6 +63,7 @@ struct Vertex
 
 std::vector<char> readBinaryFile(const std::string& filename);
 stbi_uc* loadTexture(std::string fileName, int* width, int* height, VkDeviceSize* imageSize);
+stbi_uc* loadImage(std::string filePath, int* width, int* height, VkDeviceSize* imageSize);
 
 uint32_t findMemoryTypeIndex(VkPhysicalDevice physicalDevice, const uint32_t& allowedTypes, const VkMemoryPropertyFlags& propertyFlags);
 

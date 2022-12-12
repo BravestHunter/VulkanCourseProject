@@ -1,0 +1,611 @@
+{
+  "accessors": [
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 27552,
+      "max": [
+        259.6126708984375,
+        124.82025146484375,
+        88.99211120605469
+      ],
+      "min": [
+        -178.7078399658203,
+        -151.12094116210938,
+        -91.50714111328125
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 330624,
+      "componentType": 5126,
+      "count": 27552,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 27552,
+      "max": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 27552,
+      "max": [
+        0.9980469942092896,
+        0.9936270117759705
+      ],
+      "min": [
+        0.0019529999699443579,
+        0.0019529999699443579
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 99129,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 661248,
+      "componentType": 5126,
+      "count": 366,
+      "max": [
+        134.5312042236328,
+        93.11953735351563,
+        16.861574172973633
+      ],
+      "min": [
+        120.96064758300781,
+        57.749267578125,
+        -18.77580451965332
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 665640,
+      "componentType": 5126,
+      "count": 366,
+      "max": [
+        0.9982149600982666,
+        0.9969727396965027,
+        0.9989643096923828
+      ],
+      "min": [
+        -0.9961596131324768,
+        -0.9857432246208191,
+        -0.9989610314369202
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 440832,
+      "componentType": 5126,
+      "count": 366,
+      "max": [
+        0.9947526454925537,
+        0.9936351776123047,
+        0.9439459443092346,
+        1.0
+      ],
+      "min": [
+        -0.9953797459602356,
+        -0.9590321183204651,
+        -0.9981259107589722,
+        1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 220416,
+      "componentType": 5126,
+      "count": 366,
+      "max": [
+        0.8338080048561096,
+        0.9769099950790405
+      ],
+      "min": [
+        0.03600500151515007,
+        0.020896000787615776
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 396516,
+      "componentType": 5125,
+      "count": 1788,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 670032,
+      "componentType": 5126,
+      "count": 1996,
+      "max": [
+        147.87570190429688,
+        78.04296875,
+        33.17726516723633
+      ],
+      "min": [
+        -153.3117218017578,
+        -75.04798889160156,
+        -34.93651580810547
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 693984,
+      "componentType": 5126,
+      "count": 1996,
+      "max": [
+        0.9993139505386353,
+        0.9992218613624573,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -0.9992190599441528,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 223344,
+      "componentType": 5126,
+      "count": 1996,
+      "max": [
+        0.9632580280303955,
+        0.9682390093803406
+      ],
+      "min": [
+        0.0199350006878376,
+        0.002839999971911311
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 403668,
+      "componentType": 5125,
+      "count": 6840,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 717936,
+      "componentType": 5126,
+      "count": 872,
+      "max": [
+        -119.21224212646484,
+        -3.3200759887695313,
+        5.589273929595947
+      ],
+      "min": [
+        -147.45162963867188,
+        -25.232534408569336,
+        -9.478690147399902
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 728400,
+      "componentType": 5126,
+      "count": 872,
+      "max": [
+        0.9996726512908936,
+        0.9998204708099365,
+        0.999137818813324
+      ],
+      "min": [
+        -0.9905962347984314,
+        -0.9998205304145813,
+        -0.999137818813324
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 239312,
+      "componentType": 5126,
+      "count": 872,
+      "max": [
+        0.9752449989318848,
+        0.9970570206642151
+      ],
+      "min": [
+        0.05277600139379501,
+        0.4780369997024536
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 431028,
+      "componentType": 5125,
+      "count": 2964,
+      "type": "SCALAR"
+    }
+  ],
+  "asset": {
+    "extras": {
+      "author": "henriid (https://sketchfab.com/henriid)",
+      "license": "CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)",
+      "source": "https://sketchfab.com/3d-models/vespa-scooter-d905407255ee41b5949fb6805d9a0cda",
+      "title": "Vespa / scooter"
+    },
+    "generator": "Sketchfab-14.29.0",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 442884,
+      "name": "floatBufferViews",
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 246288,
+      "byteOffset": 442884,
+      "byteStride": 8,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 738864,
+      "byteOffset": 689172,
+      "byteStride": 12,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 446688,
+      "byteOffset": 1428036,
+      "byteStride": 16,
+      "name": "floatBufferViews",
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 1874724,
+      "uri": "scene.bin"
+    }
+  ],
+  "extensionsUsed": [
+    "KHR_materials_transmission",
+    "KHR_materials_clearcoat"
+  ],
+  "images": [
+    {
+      "uri": "textures/VespaMainMat_baseColor.png"
+    },
+    {
+      "uri": "textures/VespaMainMat_metallicRoughness.png"
+    },
+    {
+      "uri": "textures/VespaMainMat_normal.png"
+    },
+    {
+      "uri": "textures/ClearGlass_normal.png"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "VespaMainMat",
+      "normalTexture": {
+        "index": 2,
+        "scale": 0.5104777462178932
+      },
+      "occlusionTexture": {
+        "index": 1
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 1
+        },
+        "roughnessFactor": 0.7116212163694212
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_transmission": {
+          "transmissionFactor": 0.635808413892309
+        }
+      },
+      "name": "ClearGlass",
+      "normalTexture": {
+        "index": 3
+      },
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.8373390532284241,
+          0.9649268545491009,
+          1.0,
+          0.364191586107691
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.14209262352037655
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "emissiveFactor": [
+        0.07813708991763524,
+        0.026860493999586652,
+        0.001422108793958068
+      ],
+      "name": "BlinkersGlass",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.6335048851616614,
+          0.1503034103965866,
+          0.009309963464103992,
+          0.8030500664382977
+        ],
+        "metallicFactor": 0.33981055942265725,
+        "roughnessFactor": 0.5626653338372078
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_clearcoat": {
+          "clearcoatFactor": 1.0,
+          "clearcoatRoughnessFactor": 0.04
+        }
+      },
+      "name": "BrakeGlass",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.6255506193977335,
+          0.05389539473040669,
+          0.024256827879361058,
+          1.0
+        ],
+        "metallicFactor": 0.4007631261352415,
+        "roughnessFactor": 0.6967609806048933
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Vespa_VespaMainMat_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 1,
+            "POSITION": 0,
+            "TANGENT": 2,
+            "TEXCOORD_0": 3
+          },
+          "indices": 4,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Vespa_ClearGlass_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 6,
+            "POSITION": 5,
+            "TANGENT": 7,
+            "TEXCOORD_0": 8
+          },
+          "indices": 9,
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Vespa_BlinkersGlass_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 11,
+            "POSITION": 10,
+            "TEXCOORD_0": 12
+          },
+          "indices": 13,
+          "material": 2,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Vespa_BrakeGlass_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 15,
+            "POSITION": 14,
+            "TEXCOORD_0": 16
+          },
+          "indices": 17,
+          "material": 3,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1
+      ],
+      "matrix": [
+        0.9310365319252014,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.0673163890210265e-16,
+        -0.9310365319252014,
+        0.0,
+        0.0,
+        0.9310365319252014,
+        2.0673163890210265e-16,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Sketchfab_model"
+    },
+    {
+      "children": [
+        2
+      ],
+      "matrix": [
+        0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.009999999776482582,
+        0.0,
+        0.0,
+        -0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "29cbe37b19f04650bddda3fb83729479.fbx"
+    },
+    {
+      "children": [
+        3
+      ],
+      "name": "RootNode"
+    },
+    {
+      "children": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "matrix": [
+        0.49427828192710876,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.49427828192710216,
+        8.052815624398705e-08,
+        0.0,
+        0.0,
+        -8.052815624398705e-08,
+        0.49427828192710216,
+        0.0,
+        -16.229915618896484,
+        74.15957641601563,
+        -10.208724021911621,
+        1.0
+      ],
+      "name": "Vespa"
+    },
+    {
+      "mesh": 0,
+      "name": "Vespa_VespaMainMat_0"
+    },
+    {
+      "mesh": 1,
+      "name": "Vespa_ClearGlass_0"
+    },
+    {
+      "mesh": 2,
+      "name": "Vespa_BlinkersGlass_0"
+    },
+    {
+      "mesh": 3,
+      "name": "Vespa_BrakeGlass_0"
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Sketchfab_Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    },
+    {
+      "sampler": 0,
+      "source": 3
+    }
+  ]
+}

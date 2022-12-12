@@ -14,7 +14,7 @@ Mesh::Mesh(const VkPhysicalDevice physicalDevice, const VkDevice& device, const 
 }
 
 
-void Mesh::DestroyBuffers()
+void Mesh::Destroy()
 {
 	vkDestroyBuffer(device_, vertexBuffer_, nullptr);
 	vkFreeMemory(device_, vertexBufferMemory_, nullptr);

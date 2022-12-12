@@ -50,13 +50,17 @@ int main()
 			angle -= 360.0f;
 		}
 
-		for (int i = 0; i < 4; i++)
-		{
-			glm::mat4 transform = glm::mat4(1.0f);
-			transform = glm::translate(transform, glm::vec3(0.0f, 0.0f, i));
-			transform = glm::rotate(transform, glm::radians(angle * (i + 1)), glm::vec3(0.0f, 0.0f, 1.0f));
-			renderer.UpdateModel(i, transform);
-		}
+		glm::mat4 transform = glm::mat4(1.0f);
+		transform = glm::rotate(transform, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
+		renderer.UpdateModel(0, transform);
+
+		//for (int i = 0; i < 4; i++)
+		//{
+		//	glm::mat4 transform = glm::mat4(1.0f);
+		//	transform = glm::translate(transform, glm::vec3(0.0f, 0.0f, i));
+		//	transform = glm::rotate(transform, glm::radians(angle * (i + 1)), glm::vec3(0.0f, 0.0f, 1.0f));
+		//	renderer.UpdateModel(i, transform);
+		//}
 
 		renderer.Draw();
 	}

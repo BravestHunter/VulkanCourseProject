@@ -23,8 +23,14 @@ std::vector<char> readBinaryFile(const std::string& filename)
 
 stbi_uc* loadTexture(std::string fileName, int* width, int* height, VkDeviceSize* imageSize)
 {
-	int channels;
 	std::string filePath = "../textures/" + fileName;
+
+	return loadImage(filePath, width, height, imageSize);
+}
+
+stbi_uc* loadImage(std::string filePath, int* width, int* height, VkDeviceSize* imageSize)
+{
+	int channels;
 	stbi_uc* imageData = stbi_load(filePath.c_str(), width, height, &channels, STBI_rgb_alpha);
 
 	if (!imageData)

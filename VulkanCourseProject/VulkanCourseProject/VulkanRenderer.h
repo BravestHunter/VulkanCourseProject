@@ -10,10 +10,13 @@
 
 #include "Utilities.h"
 #include "Mesh.h"
+#include "MeshModel.h"
 
 
 class VulkanRenderer
 {
+	friend MeshModel;
+
 public:
 	int Init(GLFWwindow* window);
 	void Deinit();
@@ -82,7 +85,7 @@ private:
 	std::vector<VkDeviceMemory> textureImagesMemory_;
 	std::vector<VkImageView> textureImageViews_;
 
-	std::vector<std::unique_ptr<Mesh>> meshes_;
+	std::vector<MeshModel> models_;
 
 	struct UboViewProjection {
 		glm::mat4 projection;
@@ -133,7 +136,7 @@ private:
 
 	void AllocateDynamicBufferTransferSpace();
 
-	int CreateTextureImage(std::string fileName);
+	int CreateTextureImage(std::string fileName, bool textureFolderUsed);
 	int CreateTextureDescriptor(VkImageView textureImage);
-	int CreateTexture(std::string fileName);
+	int CreateTexture(std::string fileName, bool textureFolderUsed = true);
 };

@@ -33,7 +33,7 @@ int VulkanRenderer::Init(GLFWwindow* window)
 
 		uboViewProjection_.projection = glm::perspective(glm::radians(45.0f), (float)swapchainExtent_.width / swapchainExtent_.height, 0.1f, 1000.0f);
 		uboViewProjection_.projection[1][1] *= -1.0f;
-		uboViewProjection_.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		uboViewProjection_.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 500.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	}
 	catch (const std::runtime_error &e)
 	{
@@ -50,9 +50,9 @@ void VulkanRenderer::Deinit()
 
 	//_aligned_free(modelTransferSpace_);
 
-	for (auto& mesh : meshes_)
+	for (auto& model : models_)
 	{
-		mesh->DestroyBuffers();
+		model.Destroy();
 	}
 
 	for (size_t i = 0; i < textureImages_.size(); i++)
@@ -167,12 +167,12 @@ void VulkanRenderer::Draw()
 
 void VulkanRenderer::UpdateModel(const int& index, const glm::mat4& model)
 {
-	if (index < 0 || index >= meshes_.size())
+	if (index < 0 || index >= models_.size())
 	{
 		return;
 	}
 
-	meshes_[index]->SetModel({ model });
+	models_[index].SetModel({ model });
 }
 
 
@@ -1233,32 +1233,38 @@ void VulkanRenderer::RecordCommands(uint32_t imageIndex)
 	{
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
 
-		for (size_t j = 0; j < meshes_.size(); j++)
+		for (size_t j = 0; j < models_.size(); j++)
 		{
-			const std::unique_ptr<Mesh>& mesh = meshes_[j];
-			VkBuffer vertexBuffers[] = { mesh->GetVertexBuffer() };
-			VkDeviceSize offsets[] = { 0 };
-			vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+			const MeshModel& model = models_[j];
 
-			vkCmdBindIndexBuffer(commandBuffer, mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+			vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Model), &model.GetModel());
 
-			vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Model), &mesh->GetModel());
+			for (size_t k = 0; k < model.GetMeshCount(); k++)
+			{
+				const Mesh& mesh = model.GetMesh(k);
 
-			std::vector<VkDescriptorSet> descriptorSetGroup { descriptorSets_[imageIndex], samplerDescriptorSets_[meshes_[j]->GetTextureId()] };
-			//uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment_) * j;
-			//vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[imageIndex], 1, &dynamicOffset);
-			vkCmdBindDescriptorSets(
-				commandBuffer, 
-				VK_PIPELINE_BIND_POINT_GRAPHICS, 
-				pipelineLayout_, 
-				0, 
-				static_cast<uint32_t>(descriptorSetGroup.size()), 
-				descriptorSetGroup.data(),
-				0, 
-				nullptr
-			);
+				VkBuffer vertexBuffers[] = { mesh.GetVertexBuffer() };
+				VkDeviceSize offsets[] = { 0 };
+				vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-			vkCmdDrawIndexed(commandBuffer, mesh->GetIndexCount(), 1, 0, 0, 0);
+				vkCmdBindIndexBuffer(commandBuffer, mesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+				std::vector<VkDescriptorSet> descriptorSetGroup{ descriptorSets_[imageIndex], samplerDescriptorSets_[mesh.GetTextureId()] };
+				//uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment_) * j;
+				//vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[imageIndex], 1, &dynamicOffset);
+				vkCmdBindDescriptorSets(
+					commandBuffer,
+					VK_PIPELINE_BIND_POINT_GRAPHICS,
+					pipelineLayout_,
+					0,
+					static_cast<uint32_t>(descriptorSetGroup.size()),
+					descriptorSetGroup.data(),
+					0,
+					nullptr
+				);
+
+				vkCmdDrawIndexed(commandBuffer, mesh.GetIndexCount(), 1, 0, 0, 0);
+			}
 		}
 	}
 	vkCmdEndRenderPass(commandBuffer);
@@ -1292,64 +1298,7 @@ void VulkanRenderer::UpdateUniformBuffers(uint32_t imageIndex)
 
 void VulkanRenderer::CreateAssets()
 {
-	int texure1 = CreateTexture("cat1.png");
-	int texure2 = CreateTexture("cat2.png");
-
-	std::vector<Vertex> meshVertices1
-	{
-		Vertex { {-0.4f, -0.8f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f} }, // top right
-		Vertex { {-0.4f, -0.4f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f} }, // bottom right
-		Vertex { {-0.8f, -0.4f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} }, // bottom left
-		Vertex { {-0.8f, -0.8f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f} }  // top left
-	};
-	std::vector<Vertex> meshVertices2
-	{
-		Vertex { {0.8f, -0.8f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f} }, // top right
-		Vertex { {0.8f, -0.4f, 0.0f}, {0.0f, 1.0f, 1.0f}, {1.0f, 0.0f} }, // bottom right
-		Vertex { {0.4f, -0.4f, 0.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 0.0f} }, // bottom left
-		Vertex { {0.4f, -0.8f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} }  // top left
-	};
-
-	std::vector<Vertex> meshVertices3
-	{
-		Vertex { {-0.4f, 0.4f, 0.0f}, {1.0f, 0.0f, 1.0f}, {1.0f, 1.0f} }, // top right
-		Vertex { {-0.4f, 0.8f, 0.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, 0.0f} }, // bottom right
-		Vertex { {-0.8f, 0.8f, 0.0f}, {1.0f, 1.0f, 0.0f}, {0.0f, 0.0f} }, // bottom left
-		Vertex { {-0.8f, 0.4f, 0.0f}, {1.0f, 0.0f, 1.0f}, {0.0f, 1.0f} }  // top left
-	};
-
-	std::vector<Vertex> meshVertices4
-	{
-		Vertex { {0.8f, 0.4f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f} }, // top right
-		Vertex { {0.8f, 0.8f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f} }, // bottom right
-		Vertex { {0.4f, 0.8f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f} }, // bottom left
-		Vertex { {0.4f, 0.4f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f} }  // top left
-	};
-
-	std::vector<uint32_t> meshIndices
-	{
-		0, 1, 2,
-		2, 3, 0
-	};
-
-	// (Usually graphics queue = transfer queue)
-
-	meshes_.push_back(
-		std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue_, 
-			graphicsCommandPool_, meshVertices1, meshIndices, texure1)
-	);
-	meshes_.push_back(
-		std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue_,
-			graphicsCommandPool_, meshVertices2, meshIndices, texure2)
-	);
-	meshes_.push_back(
-		std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue_,
-			graphicsCommandPool_, meshVertices3, meshIndices, texure1)
-	);
-	meshes_.push_back(
-		std::make_unique<Mesh>(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue_,
-			graphicsCommandPool_, meshVertices4, meshIndices, texure2)
-	);
+	models_.push_back(MeshModel::LoadModel("scooter", "scene.gltf", this));
 }
 
 
@@ -1606,11 +1555,20 @@ void VulkanRenderer::AllocateDynamicBufferTransferSpace()
 	//modelTransferSpace_ = (Model*)_aligned_malloc(modelUniformAlignment_ * MAX_OBJECTS, modelUniformAlignment_);
 }
 
-int VulkanRenderer::CreateTextureImage(std::string fileName)
+int VulkanRenderer::CreateTextureImage(std::string fileName, bool textureFolderUsed)
 {
 	int width, height;
 	VkDeviceSize imageSize;
-	stbi_uc* imageData = loadTexture(fileName, &width, &height, &imageSize);
+
+	stbi_uc* imageData;
+	if (textureFolderUsed)
+	{
+		imageData = loadTexture(fileName, &width, &height, &imageSize);
+	}
+	else
+	{
+		imageData = loadImage(fileName, &width, &height, &imageSize);
+	}
 
 	VkBuffer imageStagingBuffer;
 	VkDeviceMemory imageStagingBufferMemory;
@@ -1685,9 +1643,9 @@ int VulkanRenderer::CreateTextureDescriptor(VkImageView textureImage)
 	return samplerDescriptorSets_.size() - 1;
 }
 
-int VulkanRenderer::CreateTexture(std::string fileName)
+int VulkanRenderer::CreateTexture(std::string fileName, bool textureFolderUsed)
 {
-	int textureImageIndex = CreateTextureImage(fileName);
+	int textureImageIndex = CreateTextureImage(fileName, textureFolderUsed);
 
 	VkImageView imageView = CreateImageView(textureImages_[textureImageIndex], VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 	textureImageViews_.push_back(imageView);

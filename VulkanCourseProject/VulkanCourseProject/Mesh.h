@@ -28,7 +28,7 @@ public:
 	VkBuffer GetIndexBuffer() const;
 	size_t GetIndexCount() const;
 
-	void DestroyBuffers();
+	void Destroy();
 
 private:
 	Model model_;
