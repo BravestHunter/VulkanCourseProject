@@ -11,12 +11,12 @@
 #include "VulkanRenderer.h"
 
 
-bool isVulcan—ompatible();
-GLFWwindow* createWindow(const int width = 800, const int height = 600, std::string name = "Vulcan window");
+bool isVulkan—ompatible();
+GLFWwindow* createWindow(const int width = 800, const int height = 600, std::string name = "Vulkan window");
 
 int main()
 {
-	if (isVulcan—ompatible() == false)
+	if (isVulkan—ompatible() == false)
 	{
 		return EXIT_FAILURE;
 	}
@@ -67,7 +67,7 @@ int main()
 }
 
 
-bool isVulcan—ompatible()
+bool isVulkan—ompatible()
 {
 	uint32_t extensionCount = 0;
 	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);

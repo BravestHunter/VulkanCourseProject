@@ -197,7 +197,7 @@ void VulkanRenderer::CreateVkInstance()
 	VkApplicationInfo appInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-		.pApplicationName = "Vulcan application",
+		.pApplicationName = "Vulkan application",
 		.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
 		.pEngineName = "No engine",
 		.engineVersion = VK_MAKE_VERSION(0, 0, 0),
