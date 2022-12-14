@@ -38,19 +38,26 @@ private:
 	VkQueue presentationQueue_;
 	VkSurfaceKHR surface_;
 	VkSwapchainKHR swapchain_;
+
 	std::vector<SwapchainImage> swapchainImages_;
 	std::vector<VkFramebuffer> swapchainFramebuffers_;
 	std::vector<VkCommandBuffer> commandBuffers_;
 
+	VkFormat colorBufferImageFormat_;
+	std::vector<VkImage> colorBufferImages_;
+	std::vector<VkDeviceMemory> colorBufferImagesMemory_;
+	std::vector<VkImageView> colorBufferImageViews_;
+
 	VkFormat depthBufferImageFormat_;
-	VkImage depthBufferImage_;
-	VkDeviceMemory depthBufferImageMemory_;
-	VkImageView depthBufferImageView_;
+	std::vector<VkImage> depthBufferImages_;
+	std::vector<VkDeviceMemory> depthBufferImagesMemory_;
+	std::vector<VkImageView> depthBufferImageViews_;
 
 	VkSampler textureSampler_;
 
 	VkDescriptorSetLayout descriptorSetLayout_;
 	VkDescriptorSetLayout samplerDescriptorSetLayout_;
+	VkDescriptorSetLayout inputDescriptorSetLayout_;
 	VkPushConstantRange pushConstantRange_;
 
 	std::vector<VkBuffer> vpUniformBuffer_;
@@ -65,11 +72,15 @@ private:
 
 	VkDescriptorPool descriptorPool_;
 	VkDescriptorPool samplerDescriptorPool_;
+	VkDescriptorPool inputDescriptorPool_;
 	std::vector<VkDescriptorSet> descriptorSets_;
 	std::vector<VkDescriptorSet> samplerDescriptorSets_;
+	std::vector<VkDescriptorSet> inputDescriptorSets_;
 
 	VkPipeline graphicsPipeline_;
 	VkPipelineLayout pipelineLayout_;
+	VkPipeline secondPipeline_;
+	VkPipelineLayout secondPipelineLayout_;
 	VkRenderPass renderPass_;
 
 	VkCommandPool graphicsCommandPool_;
@@ -101,7 +112,8 @@ private:
 	void CreateDescriptorSetLayout();
 	void CreatePushConstantRange();
 	void CreateCraphicsPipeline();
-	void CreateDepthBufferImage();
+	void CreateColorBufferImages();
+	void CreateDepthBufferImages();
 	void CreateFramebuffers();
 	void CreateCommandPool();
 	void CreateCommandBuffers();
@@ -109,6 +121,7 @@ private:
 	void CreateUniformBuffers();
 	void CreateDescriptorPools();
 	void CreateDescriptorSets();
+	void CreateInputDescriptorSets();
 	void CreateTextureSampler();
 
 	bool CheckInstanceExtensionSupport(std::vector<const char*> extensions);

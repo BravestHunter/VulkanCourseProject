@@ -19,7 +19,8 @@ int VulkanRenderer::Init(GLFWwindow* window)
 		CreateDescriptorSetLayout();
 		CreatePushConstantRange();
 		CreateCraphicsPipeline();
-		CreateDepthBufferImage();
+		CreateColorBufferImages();
+		CreateDepthBufferImages();
 		CreateFramebuffers();
 		CreateCommandPool();
 		CreateCommandBuffers();
@@ -27,13 +28,14 @@ int VulkanRenderer::Init(GLFWwindow* window)
 		CreateUniformBuffers();
 		CreateDescriptorPools();
 		CreateDescriptorSets();
+		CreateInputDescriptorSets();
 		CreateSynchronization();
 
 		CreateAssets();
 
 		uboViewProjection_.projection = glm::perspective(glm::radians(45.0f), (float)swapchainExtent_.width / swapchainExtent_.height, 0.1f, 1000.0f);
 		uboViewProjection_.projection[1][1] *= -1.0f;
-		uboViewProjection_.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 500.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		uboViewProjection_.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	}
 	catch (const std::runtime_error &e)
 	{
@@ -62,8 +64,10 @@ void VulkanRenderer::Deinit()
 		vkFreeMemory(mainDevice.logicalDevice, textureImagesMemory_[i], nullptr);
 	}
 
+	vkDestroyDescriptorPool(mainDevice.logicalDevice, inputDescriptorPool_, nullptr);
 	vkDestroyDescriptorPool(mainDevice.logicalDevice, samplerDescriptorPool_, nullptr);
 	vkDestroyDescriptorPool(mainDevice.logicalDevice, descriptorPool_, nullptr);
+	vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, inputDescriptorSetLayout_, nullptr);
 	vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, samplerDescriptorSetLayout_, nullptr);
 	vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, descriptorSetLayout_, nullptr);
 	for (size_t i = 0; i < swapchainImages_.size(); i++)
@@ -89,13 +93,25 @@ void VulkanRenderer::Deinit()
 		vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
 	}
 
-	vkDestroyImageView(mainDevice.logicalDevice, depthBufferImageView_, nullptr);
-	vkDestroyImage(mainDevice.logicalDevice, depthBufferImage_, nullptr);
-	vkFreeMemory(mainDevice.logicalDevice, depthBufferImageMemory_, nullptr);
+	for (size_t i = 0; i < depthBufferImages_.size(); i++)
+	{
+		vkDestroyImageView(mainDevice.logicalDevice, depthBufferImageViews_[i], nullptr);
+		vkDestroyImage(mainDevice.logicalDevice, depthBufferImages_[i], nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, depthBufferImagesMemory_[i], nullptr);
+	}
+
+	for (size_t i = 0; i < colorBufferImages_.size(); i++)
+	{
+		vkDestroyImageView(mainDevice.logicalDevice, colorBufferImageViews_[i], nullptr);
+		vkDestroyImage(mainDevice.logicalDevice, colorBufferImages_[i], nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, colorBufferImagesMemory_[i], nullptr);
+	}
 
 	vkDestroyCommandPool(mainDevice.logicalDevice, graphicsCommandPool_, nullptr);
 
+	vkDestroyPipeline(mainDevice.logicalDevice, secondPipeline_, nullptr);
 	vkDestroyPipeline(mainDevice.logicalDevice, graphicsPipeline_, nullptr);
+	vkDestroyPipelineLayout(mainDevice.logicalDevice, secondPipelineLayout_, nullptr);
 	vkDestroyPipelineLayout(mainDevice.logicalDevice, pipelineLayout_, nullptr);
 	vkDestroyRenderPass(mainDevice.logicalDevice, renderPass_, nullptr);
 
@@ -392,6 +408,12 @@ void VulkanRenderer::CreateSwapchain()
 
 void VulkanRenderer::CreateRenderPass()
 {
+	colorBufferImageFormat_ = ChooseSupportedFormat(
+		{ VK_FORMAT_R8G8B8A8_UNORM },
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	);
+
 	depthBufferImageFormat_ = ChooseSupportedFormat(
 		{ VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT },
 		VK_IMAGE_TILING_OPTIMAL,
@@ -401,14 +423,14 @@ void VulkanRenderer::CreateRenderPass()
 	// Color attachment
 	VkAttachmentDescription colorAttachment
 	{
-		.format = swapchainImageFormat_,
+		.format = colorBufferImageFormat_,
 		.samples = VK_SAMPLE_COUNT_1_BIT,
 		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+		.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 	};
 	// Depth attachment
 	VkAttachmentDescription depthAttachment
@@ -422,25 +444,105 @@ void VulkanRenderer::CreateRenderPass()
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 		.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 	};
-	std::vector<VkAttachmentDescription> renderPassAttachments { colorAttachment , depthAttachment };
 
 	VkAttachmentReference colorAttachmentReference
 	{
-		.attachment = 0,
+		.attachment = 1,
 		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 	};
 	VkAttachmentReference depthAttachmentReference
 	{
-		.attachment = 1,
+		.attachment = 2,
 		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 	};
 
-	VkSubpassDescription subpass
+	// Swapchain color attachment
+	VkAttachmentDescription swapchainColorAttachment
 	{
-		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-		.colorAttachmentCount = 1,
-		.pColorAttachments = &colorAttachmentReference,
-		.pDepthStencilAttachment = &depthAttachmentReference
+		.format = swapchainImageFormat_,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+	};
+
+	VkAttachmentReference swapchainColorAttachmentReference
+	{
+		.attachment = 0,
+		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	};
+
+	std::vector<VkAttachmentReference> inputReferences 
+	{ 
+		VkAttachmentReference
+		{
+			.attachment = 1,
+			.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		},
+		VkAttachmentReference
+		{
+			.attachment = 2,
+			.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		}
+	};
+
+	// Color attachment
+	//VkAttachmentDescription colorAttachment
+	//{
+	//	.format = swapchainImageFormat_,
+	//	.samples = VK_SAMPLE_COUNT_1_BIT,
+	//	.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+	//	.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+	//	.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+	//	.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+	//	.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+	//	.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+	//};
+	//// Depth attachment
+	//VkAttachmentDescription depthAttachment
+	//{
+	//	.format = depthBufferImageFormat_,
+	//	.samples = VK_SAMPLE_COUNT_1_BIT,
+	//	.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+	//	.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+	//	.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+	//	.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+	//	.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+	//	.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	//};
+	//std::vector<VkAttachmentDescription> renderPassAttachments { colorAttachment , depthAttachment };
+	//
+	//VkAttachmentReference colorAttachmentReference
+	//{
+	//	.attachment = 0,
+	//	.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	//};
+	//VkAttachmentReference depthAttachmentReference
+	//{
+	//	.attachment = 1,
+	//	.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	//};
+
+	std::vector<VkSubpassDescription> subpassDescriptions
+	{
+		VkSubpassDescription
+		{
+			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.colorAttachmentCount = 1,
+			.pColorAttachments = &colorAttachmentReference,
+			.pDepthStencilAttachment = &depthAttachmentReference
+		},
+		VkSubpassDescription
+		{
+			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.inputAttachmentCount = static_cast<uint32_t>(inputReferences.size()),
+			.pInputAttachments = inputReferences.data(),
+			.colorAttachmentCount = 1,
+			.pColorAttachments = &swapchainColorAttachmentReference
+		}
 	};
 
 	std::vector<VkSubpassDependency> subpassDependencies =
@@ -454,28 +556,43 @@ void VulkanRenderer::CreateRenderPass()
 			.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
 			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT
+			//.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT
+			.dependencyFlags = 0
 		},
 		// Conversion form VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 		VkSubpassDependency
 		{
 			.srcSubpass = 0,
+			.dstSubpass = 1,
+			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+			//.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT
+			.dependencyFlags = 0
+		},
+		VkSubpassDependency
+		{
+			.srcSubpass = 1,
 			.dstSubpass = VK_SUBPASS_EXTERNAL,
 			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			.dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 			.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 			.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-			.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT
+			//.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT
+			.dependencyFlags = 0
 		}
 	};
+
+	std::vector<VkAttachmentDescription> renderPassAttachments{ swapchainColorAttachment, colorAttachment , depthAttachment };
 
 	VkRenderPassCreateInfo renderPassCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.attachmentCount = static_cast<uint32_t>(renderPassAttachments.size()),
 		.pAttachments = renderPassAttachments.data(),
-		.subpassCount = 1,
-		.pSubpasses = &subpass,
+		.subpassCount = static_cast<uint32_t>(subpassDescriptions.size()),
+		.pSubpasses = subpassDescriptions.data(),
 		.dependencyCount = static_cast<uint32_t>(subpassDependencies.size()),
 		.pDependencies = subpassDependencies.data()
 	};
@@ -538,6 +655,42 @@ void VulkanRenderer::CreateDescriptorSetLayout()
 	};
 
 	result = vkCreateDescriptorSetLayout(mainDevice.logicalDevice, &samplerDescriptorSetLayoutCreateInfo, nullptr, &samplerDescriptorSetLayout_);
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create a descriptor set.");
+	}
+
+
+	std::vector<VkDescriptorSetLayoutBinding> inputDescriptorSetLayoutBindings
+	{
+		// Color input binding
+		VkDescriptorSetLayoutBinding
+		{
+			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.pImmutableSamplers = nullptr
+		},
+		// Depth input binding
+		VkDescriptorSetLayoutBinding
+		{
+			.binding = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.pImmutableSamplers = nullptr
+		}
+	};
+
+	VkDescriptorSetLayoutCreateInfo inputDescriptorSetLayoutCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.bindingCount = static_cast<uint32_t>(inputDescriptorSetLayoutBindings.size()),
+		.pBindings = inputDescriptorSetLayoutBindings.data()
+	};
+
+	result = vkCreateDescriptorSetLayout(mainDevice.logicalDevice, &inputDescriptorSetLayoutCreateInfo, nullptr, &inputDescriptorSetLayout_);
 	if (result != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to create a descriptor set.");
@@ -732,7 +885,7 @@ void VulkanRenderer::CreateCraphicsPipeline()
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size()),
-		.pSetLayouts = descriptorSetLayouts.data() ,
+		.pSetLayouts = descriptorSetLayouts.data(),
 		.pushConstantRangeCount = 1,
 		.pPushConstantRanges = &pushConstantRange_
 	};
@@ -740,7 +893,7 @@ void VulkanRenderer::CreateCraphicsPipeline()
 	VkResult result = vkCreatePipelineLayout(mainDevice.logicalDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout_);
 	if (result != VK_SUCCESS)
 	{
-		throw std::runtime_error("Failed to create runtime layout.");
+		throw std::runtime_error("Failed to create a pipeline layout.");
 	}
 
 	VkGraphicsPipelineCreateInfo graphicsPiplineCreateInfo
@@ -771,9 +924,87 @@ void VulkanRenderer::CreateCraphicsPipeline()
 
 	vkDestroyShaderModule(mainDevice.logicalDevice, vertexShaderModule, nullptr);
 	vkDestroyShaderModule(mainDevice.logicalDevice, fragmentShaderModule, nullptr);
+
+
+	vertexShaderCode = readBinaryFile("../shaders/second_vert.spv");
+	fragmentShaderCode = readBinaryFile("../shaders/second_frag.spv");
+
+	vertexShaderModule = CreateShaderModule(vertexShaderCode);
+	fragmentShaderModule = CreateShaderModule(fragmentShaderCode);
+
+	vertexShaderCreateInfo.module = vertexShaderModule;
+	fragmentShaderCreateInfo.module = fragmentShaderModule;
+
+	VkPipelineShaderStageCreateInfo secondShaderStages[] = { vertexShaderCreateInfo, fragmentShaderCreateInfo };
+
+	vertexInputCreateInfo.vertexBindingDescriptionCount = 0;
+	vertexInputCreateInfo.pVertexBindingDescriptions = nullptr;
+	vertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
+	vertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;
+
+	depthStencilStateCreateInfo.depthWriteEnable = VK_FALSE;
+
+	VkPipelineLayoutCreateInfo secondPipelineLayoutCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.setLayoutCount = 1,
+		.pSetLayouts = &inputDescriptorSetLayout_,
+		.pushConstantRangeCount = 0,
+		.pPushConstantRanges = nullptr
+	};
+
+	result = vkCreatePipelineLayout(mainDevice.logicalDevice, &secondPipelineLayoutCreateInfo, nullptr, &secondPipelineLayout_);
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create a pipeline layout.");
+	}
+
+	graphicsPiplineCreateInfo.pStages = secondShaderStages;
+	graphicsPiplineCreateInfo.layout = secondPipelineLayout_;
+	graphicsPiplineCreateInfo.subpass = 1;
+
+	result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &graphicsPiplineCreateInfo, nullptr, &secondPipeline_);
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create a graphics pipeline.");
+	}
+
+	vkDestroyShaderModule(mainDevice.logicalDevice, vertexShaderModule, nullptr);
+	vkDestroyShaderModule(mainDevice.logicalDevice, fragmentShaderModule, nullptr);
 }
 
-void VulkanRenderer::CreateDepthBufferImage()
+void VulkanRenderer::CreateColorBufferImages()
+{
+	if (colorBufferImageFormat_ == VK_FORMAT_UNDEFINED)
+	{
+		colorBufferImageFormat_ = ChooseSupportedFormat(
+			{ VK_FORMAT_R8G8B8A8_UNORM },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		);
+	}
+
+	colorBufferImages_.resize(swapchainImages_.size());
+	colorBufferImagesMemory_.resize(swapchainImages_.size());
+	colorBufferImageViews_.resize(swapchainImages_.size());
+
+	for (size_t i = 0; i < colorBufferImages_.size(); i++)
+	{
+		colorBufferImages_[i] = CreateImage(
+			swapchainExtent_.width,
+			swapchainExtent_.height,
+			colorBufferImageFormat_,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			&colorBufferImagesMemory_[i]
+		);
+
+		colorBufferImageViews_[i] = CreateImageView(colorBufferImages_[i], colorBufferImageFormat_, VK_IMAGE_ASPECT_COLOR_BIT);
+	}
+}
+
+void VulkanRenderer::CreateDepthBufferImages()
 {
 	if (depthBufferImageFormat_ == VK_FORMAT_UNDEFINED)
 	{
@@ -784,17 +1015,24 @@ void VulkanRenderer::CreateDepthBufferImage()
 		);
 	}
 
-	depthBufferImage_ = CreateImage(
-		swapchainExtent_.width, 
-		swapchainExtent_.height, 
-		depthBufferImageFormat_,
-		VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		&depthBufferImageMemory_
-	);
+	depthBufferImages_.resize(swapchainImages_.size());
+	depthBufferImagesMemory_.resize(swapchainImages_.size());
+	depthBufferImageViews_.resize(swapchainImages_.size());
 
-	depthBufferImageView_ = CreateImageView(depthBufferImage_, depthBufferImageFormat_, VK_IMAGE_ASPECT_DEPTH_BIT);
+	for (size_t i = 0; i < depthBufferImages_.size(); i++)
+	{
+		depthBufferImages_[i] = CreateImage(
+			swapchainExtent_.width,
+			swapchainExtent_.height,
+			depthBufferImageFormat_,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			&depthBufferImagesMemory_[i]
+		);
+
+		depthBufferImageViews_[i] = CreateImageView(depthBufferImages_[i], depthBufferImageFormat_, VK_IMAGE_ASPECT_DEPTH_BIT);
+	}
 }
 
 void VulkanRenderer::CreateFramebuffers()
@@ -806,7 +1044,8 @@ void VulkanRenderer::CreateFramebuffers()
 		std::vector<VkImageView> attachments
 		{
 			swapchainImages_[i].imageView,
-			depthBufferImageView_
+			colorBufferImageViews_[i],
+			depthBufferImageViews_[i]
 		};
 
 		VkFramebufferCreateInfo framebufferCreateInfo
@@ -965,6 +1204,36 @@ void VulkanRenderer::CreateDescriptorPools()
 	{
 		throw std::runtime_error("Failed to create a descriptor pool.");
 	}
+
+	std::vector<VkDescriptorPoolSize> inputDescriptorPoolSizes
+	{
+		// Color attachment
+		VkDescriptorPoolSize
+		{
+			.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+			.descriptorCount = static_cast<uint32_t>(colorBufferImageViews_.size())
+		},
+		// Depth attachment
+		VkDescriptorPoolSize
+		{
+			.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+			.descriptorCount = static_cast<uint32_t>(depthBufferImageViews_.size())
+		}
+	};
+
+	VkDescriptorPoolCreateInfo inputDescriptorPoolCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		.maxSets = static_cast<uint32_t>(colorBufferImageViews_.size()),
+		.poolSizeCount = static_cast<uint32_t>(inputDescriptorPoolSizes.size()),
+		.pPoolSizes = inputDescriptorPoolSizes.data()
+	};
+
+	result = vkCreateDescriptorPool(mainDevice.logicalDevice, &inputDescriptorPoolCreateInfo, nullptr, &inputDescriptorPool_);
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create a descriptor pool.");
+	}
 }
 
 void VulkanRenderer::CreateDescriptorSets()
@@ -1023,6 +1292,68 @@ void VulkanRenderer::CreateDescriptorSets()
 		//	.pBufferInfo = &modelBufferInfo
 		//};
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets { vpSetWrite/*, modelSetWrite*/ };
+
+		vkUpdateDescriptorSets(mainDevice.logicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+	}
+}
+
+void VulkanRenderer::CreateInputDescriptorSets()
+{
+	inputDescriptorSets_.resize(swapchainImages_.size());
+
+	std::vector<VkDescriptorSetLayout> descriptorSetLayouts(swapchainImages_.size(), inputDescriptorSetLayout_);
+
+	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		.descriptorPool = inputDescriptorPool_,
+		.descriptorSetCount = static_cast<uint32_t>(swapchainImages_.size()),
+		.pSetLayouts = descriptorSetLayouts.data()
+	};
+
+	VkResult result = vkAllocateDescriptorSets(mainDevice.logicalDevice, &descriptorSetAllocateInfo, inputDescriptorSets_.data());
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to allocate input attachments descriptor sets.");
+	}
+
+	for (size_t i = 0; i < inputDescriptorSets_.size(); i++)
+	{
+		VkDescriptorImageInfo colorAttachmentDescriptorInfo
+		{
+			.sampler = VK_NULL_HANDLE,
+			.imageView = colorBufferImageViews_[i],
+			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		};
+		VkWriteDescriptorSet colorWriteDescriptorSet
+		{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = inputDescriptorSets_[i],
+			.dstBinding = 0,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+			.pImageInfo = &colorAttachmentDescriptorInfo
+		};
+
+		VkDescriptorImageInfo depthAttachmentDescriptorInfo
+		{
+			.sampler = VK_NULL_HANDLE,
+			.imageView = depthBufferImageViews_[i],
+			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		};
+		VkWriteDescriptorSet depthWriteDescriptorSet
+		{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = inputDescriptorSets_[i],
+			.dstBinding = 1,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+			.pImageInfo = &depthAttachmentDescriptorInfo
+		};
+
+		std::vector<VkWriteDescriptorSet> writeDescriptorSets { colorWriteDescriptorSet, depthWriteDescriptorSet };
 
 		vkUpdateDescriptorSets(mainDevice.logicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
@@ -1194,6 +1525,14 @@ void VulkanRenderer::RecordCommands(uint32_t imageIndex)
 
 	std::vector<VkClearValue> clearValues
 	{
+		//VkClearValue
+		//{
+		//	.color = VkClearColorValue { 0.6f, 0.65f, 0.4f, 0.0f }
+		//},
+		VkClearValue
+		{
+			.color = VkClearColorValue { 0.0f, 0.0f, 0.0f, 1.0f }
+		},
 		VkClearValue
 		{
 			.color = VkClearColorValue { 0.6f, 0.65f, 0.4f, 0.0f }
@@ -1266,6 +1605,12 @@ void VulkanRenderer::RecordCommands(uint32_t imageIndex)
 				vkCmdDrawIndexed(commandBuffer, mesh.GetIndexCount(), 1, 0, 0, 0);
 			}
 		}
+
+		vkCmdNextSubpass(commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, secondPipeline_);
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, secondPipelineLayout_, 0, 1, &inputDescriptorSets_[imageIndex], 0, nullptr);
+		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 	}
 	vkCmdEndRenderPass(commandBuffer);
 
